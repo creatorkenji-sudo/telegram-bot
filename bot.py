@@ -21,17 +21,25 @@ def send_message(text):
 
 # ================= DATA =================
 def get_data(symbol):
-    url = f"https://api.binance.com/api/v3/klines"
+    url = "https://api.binance.com/api/v3/klines"
     params = {"symbol": symbol, "interval": INTERVAL, "limit": LIMIT}
-    data = requests.get(url, params=params).json()
 
-    df = pd.DataFrame(data, columns=[
-        "time","open","high","low","close","volume",
-        "c1","c2","c3","c4","c5","c6"
-    ])
+    try:
+        data = requests.get(url, params=params, timeout=10).json()
 
-    df["close"] = df["close"].astype(float)
-    return df
+        if not isinstance(data, list):
+            return pd.DataFrame()
+
+        df = pd.DataFrame(data, columns=[
+            "time","open","high","low","close","volume",
+            "c1","c2","c3","c4","c5","c6"
+        ])
+
+        df["close"] = pd.to_numeric(df["close"], errors="coerce")
+        return df
+
+    except:
+        return pd.DataFrame()
 
 # ================= INDICATORS =================
 def add_indicators(df):
@@ -52,6 +60,11 @@ def check_signal(symbol, df):
 
     df = add_indicators(df).dropna()
 
+    # ✅ FIX QUAN TRỌNG
+    if len(df) < 120:
+        print(f"Not enough data: {symbol}")
+        return
+
     prev = df.iloc[-2]
     curr = df.iloc[-1]
 
@@ -69,7 +82,6 @@ def check_signal(symbol, df):
     elif curr["stoch_k"] < 0.2:
         signal.append("⚠️ StochRSI QUÁ BÁN")
 
-    # tránh spam
     if signal:
         key = symbol + str(signal)
         if last_signal.get(symbol) != key:
@@ -83,6 +95,7 @@ def run():
     while True:
         try:
             for symbol in SYMBOLS:
+                print(f"Checking {symbol}...")
                 df = get_data(symbol)
                 check_signal(symbol, df)
 
