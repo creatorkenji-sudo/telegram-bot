@@ -6,7 +6,7 @@ from ta.momentum import StochRSIIndicator
 
 # ================= CONFIG =================
 TOKEN = "8965760476:AAGkOaVyGQ4IP-iBVKRqkGl76K-_fx5tS-g"
-CHAT_ID = "8965760476"
+CHAT_ID = "7648621364"
 
 SYMBOLS = ["HYPEUSDT", "NEARUSDT"]
 INTERVAL = "15m"
