@@ -7,8 +7,7 @@ STRATEGY = {
     "stoch_overbought": 0.8,
     "stoch_oversold": 0.2,
 
-    "min_candles": 120,
+    "symbols": ["HYPEUSDT", "NEARUSDT"],
     "check_interval": 60,
-
-    "symbols": ["HYPEUSDT", "NEARUSDT"]
+    "min_candles": 120
 }

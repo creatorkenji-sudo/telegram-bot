@@ -1,20 +1,40 @@
 import requests
 import pandas as pd
 import time
+import os
+
 from ta.trend import EMAIndicator
 from ta.momentum import StochRSIIndicator
 
-# ================= CONFIG =================
-TOKEN = "8965760476:AAGkOaVyGQ4IP-iBVKRqkGl76K-_fx5tS-g"
-CHAT_ID = "7648621364"
+# ================= CONFIG IMPORT =================
+try:
+    from config import STRATEGY
+except:
+    STRATEGY = {
+        "ema_cross": True,
+        "ema_fast": 20,
+        "ema_slow": 100,
+        "use_stochrsi": True,
+        "stoch_overbought": 0.8,
+        "stoch_oversold": 0.2,
+        "symbols": ["HYPEUSDT", "NEARUSDT"],
+        "check_interval": 60,
+        "min_candles": 120
+    }
 
-SYMBOLS = ["HYPEUSDT", "NEARUSDT"]
-INTERVAL = "15m"
-LIMIT = 200
-CHECK_EVERY = 60
+# ================= ENV (Railway safe) =================
+TOKEN = os.getenv("8965760476:AAGkOaVyGQ4IP-iBVKRqkGl76K-_fx5tS-g")
+CHAT_ID = os.getenv("7648621364")
+
+# ================= STATE =================
+last_signal = {}
 
 # ================= TELEGRAM =================
 def send_message(text):
+    if not TOKEN or not CHAT_ID:
+        print("Missing TOKEN or CHAT_ID")
+        return
+
     try:
         url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
         requests.post(url, data={"chat_id": CHAT_ID, "text": text}, timeout=10)
@@ -25,12 +45,11 @@ def send_message(text):
 def get_data(symbol):
     try:
         url = "https://api.binance.com/api/v3/klines"
-        params = {"symbol": symbol, "interval": INTERVAL, "limit": LIMIT}
+        params = {"symbol": symbol, "interval": "15m", "limit": 200}
 
         r = requests.get(url, params=params, timeout=10)
         data = r.json()
 
-        # check API valid
         if not isinstance(data, list):
             return pd.DataFrame()
 
@@ -38,30 +57,65 @@ def get_data(symbol):
         df.columns = ["time", "open", "high", "low", "close", "volume"]
 
         df["close"] = pd.to_numeric(df["close"], errors="coerce")
+
         return df
 
     except Exception as e:
-        print(f"get_data error {symbol}:", e)
+        print("get_data error:", e)
         return pd.DataFrame()
 
 # ================= INDICATORS =================
 def add_indicators(df):
-    df["ema20"] = EMAIndicator(df["close"], window=20).ema_indicator()
-    df["ema100"] = EMAIndicator(df["close"], window=100).ema_indicator()
+    df["ema_fast"] = EMAIndicator(df["close"], STRATEGY["ema_fast"]).ema_indicator()
+    df["ema_slow"] = EMAIndicator(df["close"], STRATEGY["ema_slow"]).ema_indicator()
 
     stoch = StochRSIIndicator(df["close"], window=14, smooth1=3, smooth2=3)
     df["stoch_k"] = stoch.stochrsi_k()
-    df["stoch_d"] = stoch.stochrsi_d()
 
     return df
 
-# ================= SIGNAL =================
-            send_message(f"{symbol}\n" + "\n".join(signals))
+# ================= STRATEGY ENGINE =================
+def check_signal(symbol, df):
+    global last_signal
 
+    if df.empty or "close" not in df.columns:
+        return
+
+    df = add_indicators(df).dropna()
+
+    if len(df) < STRATEGY["min_candles"]:
+        return
+
+    prev = df.iloc[-2]
+    curr = df.iloc[-1]
+
+    signals = []
+
+    # ===== EMA CROSS =====
+    if STRATEGY["ema_cross"]:
+        if prev["ema_fast"] < prev["ema_slow"] and curr["ema_fast"] > curr["ema_slow"]:
+            signals.append("📈 EMA CROSS UP")
+        elif prev["ema_fast"] > prev["ema_slow"] and curr["ema_fast"] < curr["ema_slow"]:
+            signals.append("📉 EMA CROSS DOWN")
+
+    # ===== STOCH RSI =====
+    if STRATEGY["use_stochrsi"]:
+        if curr["stoch_k"] > STRATEGY["stoch_overbought"]:
+            signals.append("⚠️ OVERBOUGHT")
+        elif curr["stoch_k"] < STRATEGY["stoch_oversold"]:
+            signals.append("⚠️ OVERSOLD")
+
+    # ===== SEND =====
+    if signals:
+        key = symbol + str(signals)
+
+        if last_signal.get(symbol) != key:
+            last_signal[symbol] = key
+            send_message(f"{symbol}\n" + "\n".join(signals))
 
 # ================= MAIN LOOP =================
 def run():
-    send_message("🤖 Strategy Builder Bot Started")
+    send_message("🤖 Strategy Bot Started")
 
     while True:
         for symbol in STRATEGY["symbols"]:
@@ -76,8 +130,8 @@ def run():
                 check_signal(symbol, df)
 
             except Exception as e:
-                print(e)
-                send_message(f"❌ Error {symbol}: {e}")
+                print(f"Error {symbol}:", e)
+                send_message(f"❌ {symbol}: {e}")
 
         time.sleep(STRATEGY["check_interval"])
 
