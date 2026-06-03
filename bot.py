@@ -116,6 +116,7 @@ def check_signal(symbol, df):
 # ================= MAIN LOOP =================
 def run():
     send_message("🤖 Strategy Bot Started")
+    send_message("🧪 Test Telegram OK")
 
     while True:
         for symbol in STRATEGY["symbols"]:
