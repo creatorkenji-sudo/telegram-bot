@@ -56,52 +56,15 @@ def add_indicators(df):
     return df
 
 # ================= SIGNAL =================
-last_signal = {}
-
-def check_signal(symbol, df):
-    global last_signal
-
-    if df.empty or "close" not in df.columns:
-        return
-
-    df = add_indicators(df).dropna()
-
-    # MUST HAVE ENOUGH DATA
-    if len(df) < 120:
-        print(f"Not enough data for {symbol}")
-        return
-
-    prev = df.iloc[-2]
-    curr = df.iloc[-1]
-
-    signals = []
-
-    # EMA CROSS
-    if prev["ema20"] < prev["ema100"] and curr["ema20"] > curr["ema100"]:
-        signals.append("📈 EMA20 cắt lên EMA100 (BULLISH)")
-    elif prev["ema20"] > prev["ema100"] and curr["ema20"] < curr["ema100"]:
-        signals.append("📉 EMA20 cắt xuống EMA100 (BEARISH)")
-
-    # STOCH RSI
-    if curr["stoch_k"] > 0.8:
-        signals.append("⚠️ StochRSI QUÁ MUA")
-    elif curr["stoch_k"] < 0.2:
-        signals.append("⚠️ StochRSI QUÁ BÁN")
-
-    # SEND SIGNAL (NO SPAM)
-    if signals:
-        key = symbol + str(signals)
-
-        if last_signal.get(symbol) != key:
-            last_signal[symbol] = key
             send_message(f"{symbol}\n" + "\n".join(signals))
+
 
 # ================= MAIN LOOP =================
 def run():
-    send_message("🤖 Bot started")
+    send_message("🤖 Strategy Builder Bot Started")
 
     while True:
-        for symbol in SYMBOLS:
+        for symbol in STRATEGY["symbols"]:
             try:
                 print(f"Checking {symbol}...")
 
@@ -113,10 +76,10 @@ def run():
                 check_signal(symbol, df)
 
             except Exception as e:
-                print(f"Error {symbol}:", e)
-                send_message(f"❌ {symbol}: {e}")
+                print(e)
+                send_message(f"❌ Error {symbol}: {e}")
 
-        time.sleep(CHECK_EVERY)
+        time.sleep(STRATEGY["check_interval"])
 
 # ================= START =================
 if __name__ == "__main__":
