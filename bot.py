@@ -11,45 +11,43 @@ CHAT_ID = "7648621364"
 SYMBOLS = ["HYPEUSDT", "NEARUSDT"]
 INTERVAL = "15m"
 LIMIT = 200
-
-CHECK_EVERY = 60  # giây
+CHECK_EVERY = 60
 
 # ================= TELEGRAM =================
 def send_message(text):
-    url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
-    requests.post(url, data={"chat_id": CHAT_ID, "text": text})
+    try:
+        url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
+        requests.post(url, data={"chat_id": CHAT_ID, "text": text}, timeout=10)
+    except Exception as e:
+        print("Telegram error:", e)
 
 # ================= DATA =================
 def get_data(symbol):
-    url = "https://api.binance.com/api/v3/klines"
-    params = {"symbol": symbol, "interval": INTERVAL, "limit": LIMIT}
-
     try:
-        data = requests.get(url, params=params, timeout=10).json()
+        url = "https://api.binance.com/api/v3/klines"
+        params = {"symbol": symbol, "interval": INTERVAL, "limit": LIMIT}
 
-        # ❌ API lỗi → không phải list
+        r = requests.get(url, params=params, timeout=10)
+        data = r.json()
+
+        # check API valid
         if not isinstance(data, list):
             return pd.DataFrame()
 
-        df = pd.DataFrame(data)
-
-        # Binance format chuẩn: close = index 4
-        df = df.iloc[:, :6]
-        df.columns = ["time","open","high","low","close","volume"]
+        df = pd.DataFrame(data).iloc[:, :6]
+        df.columns = ["time", "open", "high", "low", "close", "volume"]
 
         df["close"] = pd.to_numeric(df["close"], errors="coerce")
-
         return df
 
-    except:
+    except Exception as e:
+        print(f"get_data error {symbol}:", e)
         return pd.DataFrame()
 
 # ================= INDICATORS =================
 def add_indicators(df):
-    if df.empty or "close" not in df.columns:
-    return
-    df["ema20"] = EMAIndicator(df["close"], 20).ema_indicator()
-    df["ema100"] = EMAIndicator(df["close"], 100).ema_indicator()
+    df["ema20"] = EMAIndicator(df["close"], window=20).ema_indicator()
+    df["ema100"] = EMAIndicator(df["close"], window=100).ema_indicator()
 
     stoch = StochRSIIndicator(df["close"], window=14, smooth1=3, smooth2=3)
     df["stoch_k"] = stoch.stochrsi_k()
@@ -57,55 +55,69 @@ def add_indicators(df):
 
     return df
 
-# ================= SIGNAL CHECK =================
+# ================= SIGNAL =================
 last_signal = {}
 
 def check_signal(symbol, df):
     global last_signal
 
+    if df.empty or "close" not in df.columns:
+        return
+
     df = add_indicators(df).dropna()
 
-    if df.empty or len(df) < 120:
-    return
+    # MUST HAVE ENOUGH DATA
+    if len(df) < 120:
+        print(f"Not enough data for {symbol}")
+        return
 
     prev = df.iloc[-2]
     curr = df.iloc[-1]
 
-    signal = []
+    signals = []
 
-    # EMA cross
+    # EMA CROSS
     if prev["ema20"] < prev["ema100"] and curr["ema20"] > curr["ema100"]:
-        signal.append("📈 EMA20 cắt lên EMA100 (BULLISH)")
+        signals.append("📈 EMA20 cắt lên EMA100 (BULLISH)")
     elif prev["ema20"] > prev["ema100"] and curr["ema20"] < curr["ema100"]:
-        signal.append("📉 EMA20 cắt xuống EMA100 (BEARISH)")
+        signals.append("📉 EMA20 cắt xuống EMA100 (BEARISH)")
 
-    # StochRSI
+    # STOCH RSI
     if curr["stoch_k"] > 0.8:
-        signal.append("⚠️ StochRSI QUÁ MUA")
+        signals.append("⚠️ StochRSI QUÁ MUA")
     elif curr["stoch_k"] < 0.2:
-        signal.append("⚠️ StochRSI QUÁ BÁN")
+        signals.append("⚠️ StochRSI QUÁ BÁN")
 
-    if signal:
-        key = symbol + str(signal)
+    # SEND SIGNAL (NO SPAM)
+    if signals:
+        key = symbol + str(signals)
+
         if last_signal.get(symbol) != key:
             last_signal[symbol] = key
-            send_message(f"{symbol}\n" + "\n".join(signal))
+            send_message(f"{symbol}\n" + "\n".join(signals))
 
 # ================= MAIN LOOP =================
 def run():
     send_message("🤖 Bot started")
 
     while True:
-        try:
-            for symbol in SYMBOLS:
+        for symbol in SYMBOLS:
+            try:
                 print(f"Checking {symbol}...")
+
                 df = get_data(symbol)
+
+                if df.empty:
+                    continue
+
                 check_signal(symbol, df)
 
-        except Exception as e:
-            send_message(f"❌ Error: {str(e)}")
+            except Exception as e:
+                print(f"Error {symbol}:", e)
+                send_message(f"❌ {symbol}: {e}")
 
         time.sleep(CHECK_EVERY)
 
+# ================= START =================
 if __name__ == "__main__":
     run()
