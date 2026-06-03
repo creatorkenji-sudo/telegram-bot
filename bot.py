@@ -27,15 +27,18 @@ def get_data(symbol):
     try:
         data = requests.get(url, params=params, timeout=10).json()
 
+        # ❌ API lỗi → không phải list
         if not isinstance(data, list):
             return pd.DataFrame()
 
-        df = pd.DataFrame(data, columns=[
-            "time","open","high","low","close","volume",
-            "c1","c2","c3","c4","c5","c6"
-        ])
+        df = pd.DataFrame(data)
+
+        # Binance format chuẩn: close = index 4
+        df = df.iloc[:, :6]
+        df.columns = ["time","open","high","low","close","volume"]
 
         df["close"] = pd.to_numeric(df["close"], errors="coerce")
+
         return df
 
     except:
@@ -43,6 +46,8 @@ def get_data(symbol):
 
 # ================= INDICATORS =================
 def add_indicators(df):
+    if df.empty or "close" not in df.columns:
+    return
     df["ema20"] = EMAIndicator(df["close"], 20).ema_indicator()
     df["ema100"] = EMAIndicator(df["close"], 100).ema_indicator()
 
@@ -60,10 +65,8 @@ def check_signal(symbol, df):
 
     df = add_indicators(df).dropna()
 
-    # ✅ FIX QUAN TRỌNG
-    if len(df) < 120:
-        print(f"Not enough data: {symbol}")
-        return
+    if df.empty or len(df) < 120:
+    return
 
     prev = df.iloc[-2]
     curr = df.iloc[-1]
