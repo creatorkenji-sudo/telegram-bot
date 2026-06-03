@@ -23,8 +23,8 @@ except:
     }
 
 # ================= ENV (Railway safe) =================
-TOKEN = os.getenv("8965760476:AAGkOaVyGQ4IP-iBVKRqkGl76K-_fx5tS-g")
-CHAT_ID = os.getenv("7648621364")
+TOKEN = "8965760476:AAGkOaVyGQ4IP-iBVKRqkGl76K-_fx5tS-g"
+CHAT_ID = "7648621364"
 
 # ================= STATE =================
 last_signal = {}
