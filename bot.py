@@ -37,7 +37,31 @@ def send_message(text):
 
 # ================= BYBIT PRICE =================
 def get_bybit_price(symbol):
+    try:
+        url = "https://api.bybit.com/v5/market/tickers"
 
+        params = {
+            "category": "linear",
+            "symbol": symbol
+        }
+
+        r = requests.get(url, params=params, timeout=10)
+
+        print("Status:", r.status_code)
+        print("Response:", r.text[:500])
+
+        data = r.json()
+
+        ticker = data["result"]["list"][0]
+
+        return {
+            "price": float(ticker["lastPrice"]),
+            "change": float(ticker["price24hPcnt"]) * 100
+        }
+
+    except Exception as e:
+        print("Price error:", e)
+        return None
     try:
         url = "https://api.bybit.com/v5/market/tickers"
 
