@@ -30,7 +30,7 @@ def send_message(text):
 
 
 # ================= GET CANDLES =================
-ddef get_candles():
+def get_candles():
     try:
         url = "https://api.binance.com/api/v3/klines"
 
