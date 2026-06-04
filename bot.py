@@ -1,174 +1,106 @@
 import requests
-import pandas as pd
 import time
-import os
 
-from ta.trend import EMAIndicator
-from ta.momentum import StochRSIIndicator
-
-# ================= CONFIG IMPORT =================
+# ================= CONFIG =================
 try:
     from config import STRATEGY
 except:
     STRATEGY = {
-        "ema_cross": True,
-        "ema_fast": 20,
-        "ema_slow": 50,
-        "use_stochrsi": True,
-        "stoch_overbought": 0.7,
-        "stoch_oversold": 0.3,
-        "symbols": ["HYPEUSDT", "NEARUSDT"],
-        "check_interval": 60,
-        "min_candles": 120
+        "exchange": "bybit",
+        "symbols": ["WLDUSDT"],
+        "check_interval": 300
     }
 
-# ================= ENV (Railway safe) =================
+# ================= TELEGRAM =================
 TOKEN = "8965760476:AAGkOaVyGQ4IP-iBVKRqkGl76K-_fx5tS-g"
 CHAT_ID = "7648621364"
 
-# ================= STATE =================
-last_signal = {}
 
-# ================= TELEGRAM =================
 def send_message(text):
-    if not TOKEN or not CHAT_ID:
-        print("Missing TOKEN or CHAT_ID")
-        return
-
     try:
         url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
-        requests.post(url, data={"chat_id": CHAT_ID, "text": text}, timeout=10)
+
+        r = requests.post(
+            url,
+            data={
+                "chat_id": CHAT_ID,
+                "text": text
+            },
+            timeout=10
+        )
+
+        print("Telegram:", r.status_code)
+
     except Exception as e:
         print("Telegram error:", e)
 
-# ================= DATA =================
-def get_data(symbol):
+
+# ================= BYBIT PRICE =================
+def get_bybit_price(symbol):
+
     try:
-        url = "https://api.binance.com/api/v3/klines"
-        params = {"symbol": symbol, "interval": "15m", "limit": 200}
+        url = "https://api.bybit.com/v5/market/tickers"
+
+        params = {
+            "category": "linear",
+            "symbol": symbol
+        }
 
         r = requests.get(url, params=params, timeout=10)
         data = r.json()
 
-        if not isinstance(data, list):
-            return pd.DataFrame()
+        if data.get("retCode") != 0:
+            print("Bybit error:", data)
+            return None
 
-        df = pd.DataFrame(data).iloc[:, :6]
-        df.columns = ["time", "open", "high", "low", "close", "volume"]
-        
+        ticker = data["result"]["list"][0]
 
-        df["open"] = pd.to_numeric(df["open"], errors="coerce")
-        df["high"] = pd.to_numeric(df["high"], errors="coerce")
-        df["low"] = pd.to_numeric(df["low"], errors="coerce")
-        df["close"] = pd.to_numeric(df["close"], errors="coerce")
-        
-        return df
+        return {
+            "price": float(ticker["lastPrice"]),
+            "change": float(ticker["price24hPcnt"]) * 100
+        }
 
     except Exception as e:
-        print("get_data error:", e)
-        return pd.DataFrame()
+        print("Price error:", e)
+        return None
 
-# ================= INDICATORS =================
-def add_indicators(df):
-    df["ema_fast"] = EMAIndicator(df["close"], STRATEGY["ema_fast"]).ema_indicator()
-    df["ema_slow"] = EMAIndicator(df["close"], STRATEGY["ema_slow"]).ema_indicator()
 
-    stoch = StochRSIIndicator(df["close"], window=14, smooth1=3, smooth2=3)
-    df["stoch_k"] = stoch.stochrsi_k()
-
-    return df
-
-# ================= STRATEGY ENGINE =================
-def check_signal(symbol, df):
-    global last_signal
-
-    if df.empty or "close" not in df.columns:
-        return
-
-    df = add_indicators(df).dropna()
-
-    if len(df) < STRATEGY["min_candles"]:
-        return
-
-    prev = df.iloc[-2]
-    curr = df.iloc[-1]
-
-    signals = []
-
-    # ===== EMA SIGNAL =====
-    if STRATEGY["ema_cross"]:
-
-        # EMA vừa cắt lên
-        if prev["ema_fast"] < prev["ema_slow"] and curr["ema_fast"] > curr["ema_slow"]:
-            signals.append("🚀 EMA CROSS UP")
-
-        # EMA vừa cắt xuống
-        elif prev["ema_fast"] > prev["ema_slow"] and curr["ema_fast"] < curr["ema_slow"]:
-            signals.append("💥 EMA CROSS DOWN")
-
-        # Xu hướng tăng + hồi
-        elif curr["ema_fast"] > curr["ema_slow"] and curr["stoch_k"] < 0.3:
-            signals.append("🟢 BULL TREND + STOCH OVERSOLD")
-
-        # Xu hướng giảm + hồi
-        elif curr["ema_fast"] < curr["ema_slow"] and curr["stoch_k"] > 0.7:
-            signals.append("🔴 BEAR TREND + STOCH OVERBOUGHT")
-
-    # ===== STOCH RSI =====
-    if STRATEGY["use_stochrsi"]:
-
-        # Thoát quá bán
-        if (
-            prev["stoch_k"] < STRATEGY["stoch_oversold"]
-            and curr["stoch_k"] > STRATEGY["stoch_oversold"]
-        ):
-            signals.append("🟢 STOCH RSI EXIT OVERSOLD")
-
-        # Thoát quá mua
-        elif (
-            prev["stoch_k"] > STRATEGY["stoch_overbought"]
-            and curr["stoch_k"] < STRATEGY["stoch_overbought"]
-        ):
-            signals.append("🔴 STOCH RSI EXIT OVERBOUGHT")
-
-    # ===== SEND =====
-    if signals:
-
-        key = symbol + str(signals)
-
-        if last_signal.get(symbol) != key:
-
-            last_signal[symbol] = key
-
-            message = (
-                f"📊 {symbol}\n\n"
-                + "\n".join(signals)
-                + f"\n\n💰 Price: {curr['close']}"
-            )
-
-            send_message(message)
-# ================= MAIN LOOP =================
+# ================= MAIN =================
 def run():
-    send_message("🤖 Strategy Bot Started")
-    send_message("🧪 Test Telegram OK")
+
+    send_message("🤖 WLD Bybit Bot Started")
 
     while True:
-        for symbol in STRATEGY["symbols"]:
-            try:
+
+        try:
+
+            for symbol in STRATEGY["symbols"]:
+
                 print(f"Checking {symbol}...")
 
-                df = get_data(symbol)
+                info = get_bybit_price(symbol)
 
-                if df.empty:
+                if not info:
                     continue
 
-                check_signal(symbol, df)
+                msg = (
+                    f"🪙 {symbol} (Bybit)\n\n"
+                    f"💰 Giá hiện tại: {info['price']:.4f}\n"
+                    f"📈 Thay đổi 24h: {info['change']:.2f}%"
+                )
 
-            except Exception as e:
-                print(f"Error {symbol}:", e)
-                send_message(f"❌ {symbol}: {e}")
+                send_message(msg)
+
+                print(msg)
+
+        except Exception as e:
+
+            print("Main error:", e)
+
+            send_message(f"❌ Error: {e}")
 
         time.sleep(STRATEGY["check_interval"])
+
 
 # ================= START =================
 if __name__ == "__main__":
