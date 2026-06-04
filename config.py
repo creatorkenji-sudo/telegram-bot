@@ -1,39 +1,18 @@
-STRATEGY = {
+# ================= TELEGRAM =================
+TOKEN = "8965760476:AAGkOaVyGQ4IP-iBVKRqkGl76K-_fx5tS-g"
+CHAT_ID = "7648621364"
 
-    # ===== EXCHANGE =====
-    "exchange": "bybit",
+# ================= SYMBOL =================
+SYMBOL = "BTCUSDT"
 
-    # ===== SYMBOLS =====
-    "symbols": ["WLDUSDT"],
+# ================= TIMEFRAME =================
+INTERVAL = "1h"
+LIMIT = 50
 
-    # ===== BOT =====
-    "check_interval": 60,  # 5 phút
+# ================= BOT SETTINGS =================
+CHECK_INTERVAL = 300  # giây (5 phút)
 
-    # ===== EMA =====
-    "ema_cross": False,
-    "ema_fast": 20,
-    "ema_slow": 50,
-
-    # ===== STOCH RSI =====
-    "use_stochrsi": False,
-    "stoch_overbought": 0.7,
-    "stoch_oversold": 0.3,
-
-    # ===== FILTER =====
-    "min_candles": 120,
-
-    # ===== FUTURE FEATURES =====
-    "use_rsi": False,
-    "rsi_period": 14,
-
-    "use_macd": False,
-
-    "use_volume_filter": False,
-
-    "use_tp_sl": False,
-    "tp_percent": 5,
-    "sl_percent": 2,
-
-    "send_dashboard": False,
-    "dashboard_interval": 3600
-}
+# ================= STRATEGY =================
+THRESHOLD_SHORT = 0.3   # % change ngắn hạn
+MA_PERIOD = 10          # MA bias
+MIN_SEND_CHANGE = 0.2   # chống spam %

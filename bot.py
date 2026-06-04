@@ -1,26 +1,21 @@
 import requests
 import time
 
-# ================= CONFIG =================
-try:
-    from config import STRATEGY
-except:
-    STRATEGY = {
-        "exchange": "bybit",
-        "symbols": ["WLDUSDT"],
-        "check_interval": 60
-    }
+from config import (
+    TOKEN, CHAT_ID,
+    SYMBOL, INTERVAL, LIMIT,
+    CHECK_INTERVAL,
+    THRESHOLD_SHORT,
+    MA_PERIOD,
+    MIN_SEND_CHANGE
+)
 
 # ================= TELEGRAM =================
-TOKEN = "8965760476:AAGkOaVyGQ4IP-iBVKRqkGl76K-_fx5tS-g"
-CHAT_ID = "7648621364"
-
-
 def send_message(text):
     try:
         url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
 
-        r = requests.post(
+        requests.post(
             url,
             data={
                 "chat_id": CHAT_ID,
@@ -29,68 +24,107 @@ def send_message(text):
             timeout=10
         )
 
-        print("Telegram:", r.status_code)
-
     except Exception as e:
         print("Telegram error:", e)
 
 
-# ================= GET PRICE =================
-def get_price(symbol):
+# ================= GET CANDLES =================
+def get_candles():
     try:
-        url = "https://api.coingecko.com/api/v3/simple/price"
+        url = "https://api.binance.com/api/v3/klines"
 
         params = {
-            "ids": "worldcoin-wld",
-            "vs_currencies": "usd"
+            "symbol": SYMBOL,
+            "interval": INTERVAL,
+            "limit": LIMIT
         }
 
         r = requests.get(url, params=params, timeout=10)
         data = r.json()
 
-        print(data)
+        candles = []
 
-        return {
-            "price": float(data["worldcoin-wld"]["usd"])
-        }
+        for c in data:
+            candles.append({
+                "open": float(c[1]),
+                "high": float(c[2]),
+                "low": float(c[3]),
+                "close": float(c[4]),
+                "volume": float(c[5]),
+            })
+
+        return candles
 
     except Exception as e:
-        print("Price error:", e)
+        print("Candle error:", e)
         return None
-# ================= MAIN =================
-def run():
 
-    send_message("🤖 WLD Bybit Bot Started")
+
+# ================= ANALYZE =================
+def analyze(candles):
+    closes = [c["close"] for c in candles]
+
+    last = closes[-1]
+    prev = closes[-2]
+
+    change = ((last - prev) / prev) * 100
+
+    if change > THRESHOLD_SHORT:
+        trend = "📈 Uptrend ngắn hạn"
+    elif change < -THRESHOLD_SHORT:
+        trend = "📉 Downtrend ngắn hạn"
+    else:
+        trend = "➡️ Sideway"
+
+    ma = sum(closes[-MA_PERIOD:]) / MA_PERIOD
+
+    if last > ma:
+        bias = "🟢 Bull bias"
+    else:
+        bias = "🔴 Bear bias"
+
+    return last, change, trend, bias
+
+
+# ================= MAIN LOOP =================
+def run():
+    send_message(f"🤖 Bot Started: {SYMBOL} {INTERVAL}")
+
+    last_sent_price = None
 
     while True:
-
         try:
+            candles = get_candles()
 
-            for symbol in STRATEGY["symbols"]:
+            if not candles:
+                continue
 
-                print(f"Checking {symbol}...")
+            price, change, trend, bias = analyze(candles)
 
-                info = get_price(symbol)
-
-                if not info:
+            # chống spam
+            if last_sent_price:
+                if abs(price - last_sent_price) / last_sent_price * 100 < MIN_SEND_CHANGE:
+                    time.sleep(CHECK_INTERVAL)
                     continue
 
-                msg = (
-                    f"🪙 WLD (CoinGecko)\n\n"
-                    f"💰 Giá hiện tại: ${info['price']:.4f}"
-                )
+            last_sent_price = price
 
-                send_message(msg)
+            msg = (
+                f"📊 {SYMBOL} / {INTERVAL}\n\n"
+                f"💰 Price: {price:.2f}\n"
+                f"📊 Change: {change:.2f}%\n"
+                f"{trend}\n"
+                f"{bias}"
+            )
 
-                print(msg)
+            print(msg)
+            send_message(msg)
 
         except Exception as e:
-
             print("Main error:", e)
-
             send_message(f"❌ Error: {e}")
 
-        time.sleep(STRATEGY["check_interval"])
+        time.sleep(CHECK_INTERVAL)
 
 
 # ================= START =================
