@@ -38,12 +38,13 @@ def send_message(text):
 # ================= GET PRICE =================
 def get_price(symbol):
 
-    try:
+   try:
 
-        url = "https://api.binance.com/api/v3/ticker/price"
+        url = "https://api.coingecko.com/api/v3/simple/price"
 
         params = {
-            "symbol": symbol
+            "ids": "worldcoin-wld",
+            "vs_currencies": "usd"
         }
 
         r = requests.get(url, params=params, timeout=10)
@@ -52,13 +53,8 @@ def get_price(symbol):
 
         print(data)
 
-        if "lastPrice" not in data:
-            print("Binance error:", data)
-            return None
-
         return {
-            "price": float(data["lastPrice"]),
-            "change": float(data["priceChangePercent"])
+            "price": float(data["worldcoin-wld"]["usd"])
         }
 
     except Exception as e:
@@ -79,15 +75,14 @@ def run():
 
                 print(f"Checking {symbol}...")
 
-                info = get_price(symbol)
+                info = get_price()
 
                 if not info:
                     continue
 
                 msg = (
-                    f"🪙 {symbol} (Bybit)\n\n"
-                    f"💰 Giá hiện tại: {info['price']:.4f}\n"
-                    f"📈 Thay đổi 24h: {info['change']:.2f}%"
+                    f"🪙 WLD (CoinGecko)\n\n"
+                    f"💰 Giá hiện tại: ${info['price']:.4f}"
                 )
 
                 send_message(msg)
