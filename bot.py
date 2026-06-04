@@ -41,7 +41,7 @@ def get_price(symbol):
         url = "https://api.coingecko.com/api/v3/simple/price"
 
         params = {
-            "ids": "worldcoin",
+            "ids": "worldcoin-wld",
             "vs_currencies": "usd"
         }
 
@@ -51,7 +51,7 @@ def get_price(symbol):
         print(data)
 
         return {
-            "price": float(data["worldcoin"]["usd"])
+            "price": float(data["worldcoin-wld"]["usd"])
         }
 
     except Exception as e:
