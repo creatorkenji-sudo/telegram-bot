@@ -1,5 +1,6 @@
 import requests
 import time
+import threading
 
 from config import (
     TOKEN, CHAT_ID,
@@ -29,7 +30,7 @@ def send_message(text):
 
 
 # ================= GET CANDLES =================
-def get_candles():
+ddef get_candles():
     try:
         url = "https://api.binance.com/api/v3/klines"
 
@@ -42,9 +43,18 @@ def get_candles():
         r = requests.get(url, params=params, timeout=10)
         data = r.json()
 
+        # 🚨 CHECK LỖI API
+        if isinstance(data, dict):
+            print("API error:", data)
+            return None
+
         candles = []
 
         for c in data:
+            # 🚨 check format từng candle
+            if not isinstance(c, list) or len(c) < 5:
+                continue
+
             candles.append({
                 "open": float(c[1]),
                 "high": float(c[2]),
@@ -58,7 +68,6 @@ def get_candles():
     except Exception as e:
         print("Candle error:", e)
         return None
-
 
 # ================= ANALYZE =================
 def analyze(candles):
@@ -84,9 +93,53 @@ def analyze(candles):
         bias = "🔴 Bear bias"
 
     return last, change, trend, bias
+# ================= GET PRICE =================
+def get_btc_price():
+    url = "https://api.binance.com/api/v3/ticker/price"
+    params = {"symbol": "BTCUSDT"}
 
+    r = requests.get(url, params=params, timeout=10)
+    data = r.json()
 
+    return float(data["price"])
+    
+def handle_message(text):
+    if text == "/price" or text == "/btc":
+        price = get_btc_price()
+        return f"₿ BTC hiện tại: ${price:.2f}"
+
+    return None
+    
+ def get_updates(offset=None):
+    url = f"https://api.telegram.org/bot{TOKEN}/getUpdates"
+
+    params = {"timeout": 100, "offset": offset}
+
+    r = requests.get(url, params=params)
+    return r.json()   
 # ================= MAIN LOOP =================
+def telegram_loop():
+    offset = None
+
+    while True:
+        try:
+            data = get_updates(offset)
+
+            if "result" in data:
+                for update in data["result"]:
+
+                    offset = update["update_id"] + 1
+
+                    if "message" in update:
+                        text = update["message"].get("text", "")
+
+                        reply = handle_message(text)
+
+                        if reply:
+                            send_message(reply)
+
+        except Exception as e:
+            print("Telegram error:", e)
 def run():
     send_message(f"🤖 Bot Started: {SYMBOL} {INTERVAL}")
 
@@ -129,4 +182,7 @@ def run():
 
 # ================= START =================
 if __name__ == "__main__":
+    import threading
+
+    threading.Thread(target=telegram_loop).start()
     run()
