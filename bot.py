@@ -42,7 +42,13 @@ def get_candles():
 
         r = requests.get(url, params=params, timeout=10)
         data = r.json()
+        if not isinstance(data, dict):
+            print("NOT JSON:", r.text)
+            return None
 
+        if data.get("retCode") != 0:
+            print("API ERROR:", data)
+            return None
         # 🚨 CHECK LỖI API
         if isinstance(data, dict):
             print("API error:", data)
