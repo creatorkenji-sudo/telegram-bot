@@ -42,6 +42,8 @@ def get_candles():
 
         r = requests.get(url, params=params, timeout=10)
         data = r.json()
+        print("RAW RESPONSE:")
+        print(r.text)
         if not isinstance(data, dict):
             print("NOT JSON:", r.text)
             return None
