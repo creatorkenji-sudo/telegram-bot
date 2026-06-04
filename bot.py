@@ -37,30 +37,25 @@ def send_message(text):
 
 # ================= GET PRICE =================
 def get_price(symbol):
-
-   try:
-
+    try:
         url = "https://api.coingecko.com/api/v3/simple/price"
 
         params = {
-            "ids": "worldcoin-wld",
+            "ids": "worldcoin",
             "vs_currencies": "usd"
         }
 
         r = requests.get(url, params=params, timeout=10)
-
         data = r.json()
 
         print(data)
 
         return {
-            "price": float(data["worldcoin-wld"]["usd"])
+            "price": float(data["worldcoin"]["usd"])
         }
 
     except Exception as e:
-
         print("Price error:", e)
-
         return None
 # ================= MAIN =================
 def run():
