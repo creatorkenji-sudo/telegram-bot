@@ -35,40 +35,33 @@ def get_candles():
         url = "https://api.bybit.com/v5/market/kline"
 
         params = {
+            "category": "linear",
             "symbol": SYMBOL,
             "interval": INTERVAL,
             "limit": LIMIT
         }
 
         r = requests.get(url, params=params, timeout=10)
-        data = r.json()
-        print("RAW RESPONSE:")
-        print(r.text)
-        if not isinstance(data, dict):
-            print("NOT JSON:", r.text)
-            return None
 
+        print("RAW:", r.text[:200])
+
+        data = r.json()
+
+        # ✅ check API error đúng cách
         if data.get("retCode") != 0:
             print("API ERROR:", data)
-            return None
-        # 🚨 CHECK LỖI API
-        if isinstance(data, dict):
-            print("API error:", data)
             return None
 
         candles = []
 
-        for c in data:
-            # 🚨 check format từng candle
-            if not isinstance(c, list) or len(c) < 5:
-                continue
-
+        # ✅ đúng structure Bybit
+        for c in data["result"]["list"]:
             candles.append({
                 "open": float(c[1]),
                 "high": float(c[2]),
                 "low": float(c[3]),
                 "close": float(c[4]),
-                "volume": float(c[5]),
+                "volume": float(c[5]) if len(c) > 5 else 0,
             })
 
         return candles
@@ -79,6 +72,10 @@ def get_candles():
 
 # ================= ANALYZE =================
 def analyze(candles):
+    
+    if not candles or len(candles) < 2:
+        return 0, 0, "no data", "no data"
+        
     closes = [c["close"] for c in candles]
 
     last = closes[-1]
@@ -99,7 +96,8 @@ def analyze(candles):
         bias = "🟢 Bull bias"
     else:
         bias = "🔴 Bear bias"
-
+    
+        
     return last, change, trend, bias
 # ================= GET PRICE =================
 def get_btc_price():
@@ -193,8 +191,6 @@ def run():
 
 
 # ================= START =================
-if __name__ == "__main__":
-    import threading
-
-    threading.Thread(target=telegram_loop).start()
+if __name__ == "__main__":   
+    threading.Thread(target=telegram_loop, daemon=True).start()
     run()
