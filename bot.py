@@ -110,7 +110,7 @@ def handle_message(text):
 
     return None
     
- def get_updates(offset=None):
+def get_updates(offset=None):
     url = f"https://api.telegram.org/bot{TOKEN}/getUpdates"
 
     params = {"timeout": 100, "offset": offset}
