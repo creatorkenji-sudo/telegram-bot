@@ -5,6 +5,8 @@ import threading
 last_call = 0
 cached_price = None
 
+lock = threading.Lock()
+
 from config import (
     TOKEN, CHAT_ID,
     SYMBOL, INTERVAL, LIMIT,
@@ -44,6 +46,11 @@ def get_candles():
 
         r = requests.get(url, params=params, timeout=10)
         data = r.json()
+
+        # check rate limit
+        if isinstance(data, dict) and "error" in data:
+            print("API ERROR:", data)
+            return None
 
         # 🔥 check lỗi API
         if isinstance(data, dict):
@@ -85,39 +92,52 @@ def analyze(candles):
         trend = "📉 Downtrend ngắn hạn"
     else:
         trend = "➡️ Sideway"
-
+        
+    if len(closes) < MA_PERIOD:
+        return last, change, "no data", "no bias"
     ma = sum(closes[-MA_PERIOD:]) / MA_PERIOD
-
-    if last > ma:
-        bias = "🟢 Bull bias"
-    else:
-        bias = "🔴 Bear bias"
     
+    # bias mạnh hơn
+    if last > ma * 1.001:
+        bias = "🟢 Bull bias"
+    elif last < ma * 0.999:
+        bias = "🔴 Bear bias"
+    else:
+        bias = "⚪ Neutral"
+        
+    # tránh mâu thuẫn
+    if trend == "➡️ Sideway":
+        bias = "⚪ Neutral"
         
     return last, change, trend, bias
 # ================= GET PRICE =================
 def get_btc_price():
     global last_call, cached_price
 
-    now = time.time()
+    with lock:
+        now = time.time()
 
-    if cached_price and now - last_call < 30:
+        if cached_price and now - last_call < 30:
+            return cached_price
+
+        url = "https://api.coingecko.com/api/v3/simple/price"
+
+        params = {
+            "ids": "bitcoin",
+            "vs_currencies": "usd"
+        }
+
+        r = requests.get(url, params=params, timeout=10)
+        data = r.json()
+
+        if "bitcoin" not in data:
+            print("API ERROR:", data)
+            return cached_price
+
+        cached_price = float(data["bitcoin"]["usd"])
+        last_call = now
+
         return cached_price
-
-    url = "https://api.coingecko.com/api/v3/simple/price"
-
-    params = {
-        "ids": "bitcoin",
-        "vs_currencies": "usd"
-    }
-
-    r = requests.get(url, params=params, timeout=10)
-    data = r.json()
-
-    cached_price = float(data["bitcoin"]["usd"])
-    last_call = now
-
-    return cached_price
     
 def handle_message(text):
     if text == "/price" or text == "/btc":
