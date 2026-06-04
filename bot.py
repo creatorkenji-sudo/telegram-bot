@@ -32,7 +32,7 @@ def send_message(text):
 # ================= GET CANDLES =================
 def get_candles():
     try:
-        url = "https://api.binance.com/api/v3/klines"
+        url = "https://api.bybit.com/v5/market/tickers"
 
         params = {
             "symbol": SYMBOL,
@@ -95,13 +95,17 @@ def analyze(candles):
     return last, change, trend, bias
 # ================= GET PRICE =================
 def get_btc_price():
-    url = "https://api.binance.com/api/v3/ticker/price"
-    params = {"symbol": "BTCUSDT"}
+    url = "https://api.bybit.com/v5/market/tickers"
+
+    params = {
+        "category": "linear",
+        "symbol": "BTCUSDT"
+    }
 
     r = requests.get(url, params=params, timeout=10)
     data = r.json()
 
-    return float(data["price"])
+    return float(data["result"]["list"][0]["lastPrice"])
     
 def handle_message(text):
     if text == "/price" or text == "/btc":
