@@ -8,7 +8,7 @@ except:
     STRATEGY = {
         "exchange": "bybit",
         "symbols": ["WLDUSDT"],
-        "check_interval": 300
+        "check_interval": 60
     }
 
 # ================= TELEGRAM =================

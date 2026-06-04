@@ -7,7 +7,7 @@ STRATEGY = {
     "symbols": ["WLDUSDT"],
 
     # ===== BOT =====
-    "check_interval": 300,  # 5 phút
+    "check_interval": 60,  # 5 phút
 
     # ===== EMA =====
     "ema_cross": False,
