@@ -55,9 +55,13 @@ def get_data(symbol):
 
         df = pd.DataFrame(data).iloc[:, :6]
         df.columns = ["time", "open", "high", "low", "close", "volume"]
+        
 
+        df["open"] = pd.to_numeric(df["open"], errors="coerce")
+        df["high"] = pd.to_numeric(df["high"], errors="coerce")
+        df["low"] = pd.to_numeric(df["low"], errors="coerce")
         df["close"] = pd.to_numeric(df["close"], errors="coerce")
-
+        
         return df
 
     except Exception as e:
@@ -91,52 +95,58 @@ def check_signal(symbol, df):
 
     signals = []
 
-    # ===== EMA CROSS =====
+    # ===== EMA SIGNAL =====
     if STRATEGY["ema_cross"]:
 
-    # EMA vừa cắt lên
-    if prev["ema_fast"] < prev["ema_slow"] and curr["ema_fast"] > curr["ema_slow"]:
-        signals.append("🚀 EMA CROSS UP")
+        # EMA vừa cắt lên
+        if prev["ema_fast"] < prev["ema_slow"] and curr["ema_fast"] > curr["ema_slow"]:
+            signals.append("🚀 EMA CROSS UP")
 
-    # EMA vừa cắt xuống
-    elif prev["ema_fast"] > prev["ema_slow"] and curr["ema_fast"] < curr["ema_slow"]:
-        signals.append("💥 EMA CROSS DOWN")
+        # EMA vừa cắt xuống
+        elif prev["ema_fast"] > prev["ema_slow"] and curr["ema_fast"] < curr["ema_slow"]:
+            signals.append("💥 EMA CROSS DOWN")
 
-    # EMA đang tăng mạnh
-    elif curr["ema_fast"] > curr["ema_slow"]:
-        if curr["stoch_k"] < 0.3:
+        # Xu hướng tăng + hồi
+        elif curr["ema_fast"] > curr["ema_slow"] and curr["stoch_k"] < 0.3:
             signals.append("🟢 BULL TREND + STOCH OVERSOLD")
 
-    # EMA đang giảm mạnh
-    elif curr["ema_fast"] < curr["ema_slow"]:
-        if curr["stoch_k"] > 0.7:
+        # Xu hướng giảm + hồi
+        elif curr["ema_fast"] < curr["ema_slow"] and curr["stoch_k"] > 0.7:
             signals.append("🔴 BEAR TREND + STOCH OVERBOUGHT")
 
     # ===== STOCH RSI =====
     if STRATEGY["use_stochrsi"]:
 
-    # Thoát quá bán
-    if (
-        prev["stoch_k"] < STRATEGY["stoch_oversold"]
-        and curr["stoch_k"] > STRATEGY["stoch_oversold"]
-    ):
-        signals.append("🟢 STOCH RSI EXIT OVERSOLD")
+        # Thoát quá bán
+        if (
+            prev["stoch_k"] < STRATEGY["stoch_oversold"]
+            and curr["stoch_k"] > STRATEGY["stoch_oversold"]
+        ):
+            signals.append("🟢 STOCH RSI EXIT OVERSOLD")
 
-    # Thoát quá mua
-    elif (
-        prev["stoch_k"] > STRATEGY["stoch_overbought"]
-        and curr["stoch_k"] < STRATEGY["stoch_overbought"]
-    ):
-        signals.append("🔴 STOCH RSI EXIT OVERBOUGHT")
+        # Thoát quá mua
+        elif (
+            prev["stoch_k"] > STRATEGY["stoch_overbought"]
+            and curr["stoch_k"] < STRATEGY["stoch_overbought"]
+        ):
+            signals.append("🔴 STOCH RSI EXIT OVERBOUGHT")
 
     # ===== SEND =====
     if signals:
+
         key = symbol + str(signals)
 
         if last_signal.get(symbol) != key:
-            last_signal[symbol] = key
-            send_message(f"{symbol}\n" + "\n".join(signals))
 
+            last_signal[symbol] = key
+
+            message = (
+                f"📊 {symbol}\n\n"
+                + "\n".join(signals)
+                + f"\n\n💰 Price: {curr['close']}"
+            )
+
+            send_message(message)
 # ================= MAIN LOOP =================
 def run():
     send_message("🤖 Strategy Bot Started")
