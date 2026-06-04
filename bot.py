@@ -2,6 +2,9 @@ import requests
 import time
 import threading
 
+last_call = 0
+cached_price = None
+
 from config import (
     TOKEN, CHAT_ID,
     SYMBOL, INTERVAL, LIMIT,
@@ -32,36 +35,29 @@ def send_message(text):
 # ================= GET CANDLES =================
 def get_candles():
     try:
-        url = "https://api.coingecko.com/api/v3/simple/price"
+        url = "https://api.coingecko.com/api/v3/coins/bitcoin/ohlc"
 
         params = {
-            "category": "linear",
-            "symbol": SYMBOL,
-            "interval": INTERVAL,
-            "limit": LIMIT
+            "vs_currency": "usd",
+            "days": 1
         }
 
         r = requests.get(url, params=params, timeout=10)
-
-        print("RAW:", r.text[:200])
-
         data = r.json()
 
-        # ✅ check API error đúng cách
-        if data.get("retCode") != 0:
+        # 🔥 check lỗi API
+        if isinstance(data, dict):
             print("API ERROR:", data)
             return None
 
         candles = []
 
-        # ✅ đúng structure Bybit
-        for c in data["result"]["list"]:
+        for c in data:
             candles.append({
                 "open": float(c[1]),
                 "high": float(c[2]),
                 "low": float(c[3]),
                 "close": float(c[4]),
-                "volume": float(c[5]) if len(c) > 5 else 0,
             })
 
         return candles
@@ -101,17 +97,27 @@ def analyze(candles):
     return last, change, trend, bias
 # ================= GET PRICE =================
 def get_btc_price():
+    global last_call, cached_price
+
+    now = time.time()
+
+    if cached_price and now - last_call < 30:
+        return cached_price
+
     url = "https://api.coingecko.com/api/v3/simple/price"
 
     params = {
-        "category": "linear",
-        "symbol": "BTCUSDT"
+        "ids": "bitcoin",
+        "vs_currencies": "usd"
     }
 
     r = requests.get(url, params=params, timeout=10)
     data = r.json()
 
-    return float(data["result"]["list"][0]["lastPrice"])
+    cached_price = float(data["bitcoin"]["usd"])
+    last_call = now
+
+    return cached_price
     
 def handle_message(text):
     if text == "/price" or text == "/btc":
@@ -187,7 +193,7 @@ def run():
             print("Main error:", e)
             send_message(f"❌ Error: {e}")
 
-        time.sleep(CHECK_INTERVAL)
+        time.sleep(max(60, CHECK_INTERVAL))
 
 
 # ================= START =================
