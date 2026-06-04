@@ -1,11 +1,11 @@
 STRATEGY = {
     "ema_cross": True,
     "ema_fast": 20,
-    "ema_slow": 100,
+    "ema_slow": 50,
 
     "use_stochrsi": True,
-    "stoch_overbought": 0.8,
-    "stoch_oversold": 0.2,
+    "stoch_overbought": 0.7,
+    "stoch_oversold": 0.3,
 
     "symbols": ["HYPEUSDT", "NEARUSDT"],
     "check_interval": 60,

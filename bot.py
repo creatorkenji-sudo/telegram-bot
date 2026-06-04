@@ -13,10 +13,10 @@ except:
     STRATEGY = {
         "ema_cross": True,
         "ema_fast": 20,
-        "ema_slow": 100,
+        "ema_slow": 50,
         "use_stochrsi": True,
-        "stoch_overbought": 0.8,
-        "stoch_oversold": 0.2,
+        "stoch_overbought": 0.7,
+        "stoch_oversold": 0.3,
         "symbols": ["HYPEUSDT", "NEARUSDT"],
         "check_interval": 60,
         "min_candles": 120
@@ -93,17 +93,41 @@ def check_signal(symbol, df):
 
     # ===== EMA CROSS =====
     if STRATEGY["ema_cross"]:
-        if prev["ema_fast"] < prev["ema_slow"] and curr["ema_fast"] > curr["ema_slow"]:
-            signals.append("📈 EMA CROSS UP")
-        elif prev["ema_fast"] > prev["ema_slow"] and curr["ema_fast"] < curr["ema_slow"]:
-            signals.append("📉 EMA CROSS DOWN")
+
+    # EMA vừa cắt lên
+    if prev["ema_fast"] < prev["ema_slow"] and curr["ema_fast"] > curr["ema_slow"]:
+        signals.append("🚀 EMA CROSS UP")
+
+    # EMA vừa cắt xuống
+    elif prev["ema_fast"] > prev["ema_slow"] and curr["ema_fast"] < curr["ema_slow"]:
+        signals.append("💥 EMA CROSS DOWN")
+
+    # EMA đang tăng mạnh
+    elif curr["ema_fast"] > curr["ema_slow"]:
+        if curr["stoch_k"] < 0.3:
+            signals.append("🟢 BULL TREND + STOCH OVERSOLD")
+
+    # EMA đang giảm mạnh
+    elif curr["ema_fast"] < curr["ema_slow"]:
+        if curr["stoch_k"] > 0.7:
+            signals.append("🔴 BEAR TREND + STOCH OVERBOUGHT")
 
     # ===== STOCH RSI =====
     if STRATEGY["use_stochrsi"]:
-        if curr["stoch_k"] > STRATEGY["stoch_overbought"]:
-            signals.append("⚠️ OVERBOUGHT")
-        elif curr["stoch_k"] < STRATEGY["stoch_oversold"]:
-            signals.append("⚠️ OVERSOLD")
+
+    # Thoát quá bán
+    if (
+        prev["stoch_k"] < STRATEGY["stoch_oversold"]
+        and curr["stoch_k"] > STRATEGY["stoch_oversold"]
+    ):
+        signals.append("🟢 STOCH RSI EXIT OVERSOLD")
+
+    # Thoát quá mua
+    elif (
+        prev["stoch_k"] > STRATEGY["stoch_overbought"]
+        and curr["stoch_k"] < STRATEGY["stoch_overbought"]
+    ):
+        signals.append("🔴 STOCH RSI EXIT OVERBOUGHT")
 
     # ===== SEND =====
     if signals:
