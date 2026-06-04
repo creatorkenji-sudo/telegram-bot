@@ -40,7 +40,7 @@ def get_price(symbol):
 
     try:
 
-        url = "https://api.binance.com/api/v3/ticker/24hr"
+        url = "https://api.binance.com/api/v3/ticker/price"
 
         params = {
             "symbol": symbol
@@ -49,6 +49,12 @@ def get_price(symbol):
         r = requests.get(url, params=params, timeout=10)
 
         data = r.json()
+
+        print(data)
+
+        if "lastPrice" not in data:
+            print("Binance error:", data)
+            return None
 
         return {
             "price": float(data["lastPrice"]),
