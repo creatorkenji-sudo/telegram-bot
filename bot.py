@@ -32,7 +32,7 @@ def send_message(text):
 # ================= GET CANDLES =================
 def get_candles():
     try:
-        url = "https://api.bybit.com/v5/market/tickers"
+        url = "https://api.bybit.com/v5/market/kline"
 
         params = {
             "symbol": SYMBOL,
