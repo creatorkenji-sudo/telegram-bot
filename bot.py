@@ -70,7 +70,7 @@ def run():
 
                 print(f"Checking {symbol}...")
 
-                info = get_price()
+                info = get_price(symbol)
 
                 if not info:
                     continue
