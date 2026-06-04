@@ -10,7 +10,7 @@ INTERVAL = "1h"
 LIMIT = 50
 
 # ================= BOT SETTINGS =================
-CHECK_INTERVAL = 120  # giây 
+CHECK_INTERVAL = 3600  # giây 
 
 # ================= STRATEGY =================
 THRESHOLD_SHORT = 0.3   # % change ngắn hạn
