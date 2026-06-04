@@ -73,7 +73,7 @@ def run():
 
                 print(f"Checking {symbol}...")
 
-                info = get_bybit_price(symbol)
+                info = get_price(symbol)
 
                 if not info:
                     continue
