@@ -32,7 +32,7 @@ def send_message(text):
 # ================= GET CANDLES =================
 def get_candles():
     try:
-        url = "https://api.bybit.com/v5/market/kline"
+        url = "https://api.coingecko.com/api/v3/simple/price"
 
         params = {
             "category": "linear",
@@ -101,7 +101,7 @@ def analyze(candles):
     return last, change, trend, bias
 # ================= GET PRICE =================
 def get_btc_price():
-    url = "https://api.bybit.com/v5/market/tickers"
+    url = "https://api.coingecko.com/api/v3/simple/price"
 
     params = {
         "category": "linear",
