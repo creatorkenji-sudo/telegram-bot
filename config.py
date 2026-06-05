@@ -6,8 +6,13 @@ CHAT_ID = "7648621364"
 SYMBOL = "BTCUSDT"
 
 # ================= TIMEFRAME =================
-INTERVAL = "1h"
-LIMIT = 50
+INTERVAL = "1"
+INTERVAL = "5"
+INTERVAL = "15"
+INTERVAL = "60"
+INTERVAL = "240"
+INTERVAL = "D"
+LIMIT = 200
 
 # ================= BOT SETTINGS =================
 CHECK_INTERVAL = 3600  # giây 

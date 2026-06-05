@@ -37,29 +37,27 @@ def send_message(text):
 # ================= GET CANDLES =================
 def get_candles():
     try:
-        url = "https://api.coingecko.com/api/v3/coins/bitcoin/ohlc"
+        url = "https://api.bybit.com/v5/market/kline"
 
         params = {
-            "vs_currency": "usd",
-            "days": 1
+            "category": "linear",
+            "symbol": SYMBOL,
+            "interval": INTERVAL,
+            "limit": LIMIT
         }
 
         r = requests.get(url, params=params, timeout=10)
         data = r.json()
 
-        # check rate limit
-        if isinstance(data, dict) and "error" in data:
-            print("API ERROR:", data)
-            return None
-
-        # 🔥 check lỗi API
-        if isinstance(data, dict):
-            print("API ERROR:", data)
+        if data["retCode"] != 0:
+            print("BYBIT ERROR:", data)
             return None
 
         candles = []
 
-        for c in data:
+        # Bybit trả nến mới nhất trước nên đảo ngược
+        for c in reversed(data["result"]["list"]):
+
             candles.append({
                 "open": float(c[1]),
                 "high": float(c[2]),
@@ -72,7 +70,6 @@ def get_candles():
     except Exception as e:
         print("Candle error:", e)
         return None
-
 # ================= ANALYZE =================
 def analyze(candles):
     
@@ -117,27 +114,31 @@ def get_btc_price():
     with lock:
         now = time.time()
 
-        if cached_price and now - last_call < 30:
+        if cached_price and now - last_call < 10:
             return cached_price
 
-        url = "https://api.coingecko.com/api/v3/simple/price"
+        try:
+            url = "https://api.bybit.com/v5/market/tickers"
 
-        params = {
-            "ids": "bitcoin",
-            "vs_currencies": "usd"
-        }
+            params = {
+                "category": "linear",
+                "symbol": SYMBOL
+            }
 
-        r = requests.get(url, params=params, timeout=10)
-        data = r.json()
+            r = requests.get(url, params=params, timeout=10)
+            data = r.json()
 
-        if "bitcoin" not in data:
-            print("API ERROR:", data)
+            cached_price = float(
+                data["result"]["list"][0]["lastPrice"]
+            )
+
+            last_call = now
+
             return cached_price
 
-        cached_price = float(data["bitcoin"]["usd"])
-        last_call = now
-
-        return cached_price
+        except Exception as e:
+            print("Price error:", e)
+            return cached_price
     
 def handle_message(text):
     if text == "/price" or text == "/btc":
