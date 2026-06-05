@@ -1,6 +1,6 @@
 import requests
 
-url = "https://api.bybit.com/v5/market/tickers"
+url = "https://api.bytick.com/v5/market/tickers"
 
 params = {
     "category": "linear",
