@@ -15,18 +15,35 @@ def analyze(symbol, interval, highs, lows, closes, state):
 
     signals = []
 
-    # ================= SHORT =================
+    # =========================================
+    # 1. REVERSAL (GIỮ NGUYÊN LOGIC CŨ)
+    # =========================================
+
     if state["ichimoku"] and trend_down:
         if bearish_divergence(peaks, stoch_array) and stoch > state["stoch_overbought"]:
-            signals.append("🔴 TÍN HIỆU BÁN - ĐẢO CHIỀU GIẢM")
+            signals.append("⚠️ ĐẢO CHIỀU GIẢM TIỀM NĂNG - CẢNH BÁO BÁN")
 
-    # ================= LONG =================
     if state["ichimoku"] and trend_up:
         if bullish_divergence(bottoms, stoch_array) and stoch < state["stoch_oversold"]:
-            signals.append("🟢 TÍN HIỆU MUA - ĐẢO CHIỀU TĂNG")
+            signals.append("⚠️ ĐẢO CHIỀU TĂNG TIỀM NĂNG - CẢNH BÁO MUA")
+
+    # =========================================
+    # 2. TREND + PULLBACK ENTRY (THÊM MỚI)
+    # =========================================
+
+    # LONG ENTRY
+    if trend_up:
+        if stoch < state["stoch_oversold"]:
+            signals.append("🟢 LONG ENTRY - TREND UP + PULLBACK (M15/H1)")
+
+    # SHORT ENTRY
+    if trend_down:
+        if stoch > state["stoch_overbought"]:
+            signals.append("🔴 SHORT ENTRY - TREND DOWN + RETEST (M15/H1)")
 
     return {
         "symbol": symbol,
         "stoch": round(stoch, 2),
+        "trend": "UP" if trend_up else "DOWN",
         "signals": signals
     }

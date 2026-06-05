@@ -8,5 +8,5 @@ state = {
 
     "ichimoku": True,
 
-    "report_interval": 3600
+    "report_interval": 120
 }

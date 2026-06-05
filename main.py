@@ -33,9 +33,10 @@ def get_updates():
 
 
 def scan_market():
-    msg = "📊 BÁO CÁO THỊ TRƯỜNG (ĐA KHUNG THỜI GIAN)\n\n"
+    msg = "📊 BÁO CÁO THỊ TRƯỜNG (M15 / H1 / H4 / D1)\n\n"
 
     for symbol in SYMBOLS:
+
         for tf_name, tf in TIMEFRAMES.items():
 
             highs, lows, closes = get_klines(symbol, tf)
@@ -45,10 +46,39 @@ def scan_market():
             msg += f"🪙 {symbol} | {tf_name}\n"
             msg += f"📊 StochRSI: {result['stoch']}\n"
 
-            if result["signals"]:
-                msg += "⚠️ " + " | ".join(result["signals"]) + "\n\n"
-            else:
-                msg += "Không có tín hiệu\n\n"
+            # ================= TREND INFO =================
+            if "trend" in result:
+                msg += f"📈 Trend: {result['trend']}\n"
+
+            # ================= SONG SONG ALERT SYSTEM =================
+            reversal_alerts = []
+            entry_alerts = []
+
+            for s in result["signals"]:
+
+                # phân loại cảnh báo
+                if "ĐẢO CHIỀU" in s or "CẢNH BÁO" in s:
+                    reversal_alerts.append(s)
+
+                elif "ENTRY" in s or "TREND" in s:
+                    entry_alerts.append(s)
+
+            # ================= OUTPUT REVERSAL =================
+            if reversal_alerts:
+                msg += "⚠️ ĐẢO CHIỀU TIỀM NĂNG:\n"
+                for r in reversal_alerts:
+                    msg += f"{r}\n"
+
+            # ================= OUTPUT ENTRY =================
+            if entry_alerts:
+                msg += "🟢 TÍN HIỆU VÀO LỆNH:\n"
+                for e in entry_alerts:
+                    msg += f"{e}\n"
+
+            if not reversal_alerts and not entry_alerts:
+                msg += "Không có tín hiệu\n"
+
+            msg += "\n"
 
     send(msg)
 
