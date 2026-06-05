@@ -3,8 +3,8 @@ import time
 import numpy as np
 
 # ================= CONFIG =================
-TOKEN = "YOUR_TELEGRAM_BOT_TOKEN"
-CHAT_ID = "YOUR_CHAT_ID"
+TOKEN = "8965760476:AAGkOaVyGQ4IP-iBVKRqkGl76K-_fx5tS-g"
+CHAT_ID = "7648621364"
 
 SYMBOL = "BTCUSDT"
 INTERVAL = "1h"
