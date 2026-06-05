@@ -3,7 +3,7 @@ TOKEN = "8965760476:AAGkOaVyGQ4IP-iBVKRqkGl76K-_fx5tS-g"
 CHAT_ID = "7648621364"
 
 # ================= SYMBOL =================
-SYMBOLS = ["BTCUSDT"]
+SYMBOLS = ["BTCUSDT", "ETHUSDT", "SOLUSDT"]
 
 TIMEFRAMES = {
     "M15": "15m",

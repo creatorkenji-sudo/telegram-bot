@@ -1,5 +1,3 @@
-# data.py
-
 import requests
 import numpy as np
 from config import LIMIT

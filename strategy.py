@@ -1,33 +1,32 @@
-# strategy.py
-
-from indicators import ichimoku, stoch_rsi
-from data import get_klines
-from state import state
+import numpy as np
+from indicators import *
 
 
-def analyze(symbol, interval):
+def analyze(symbol, interval, highs, lows, closes, state):
 
-    highs, lows, closes = get_klines(symbol, interval)
-
-    price = closes[-1]
     stoch = stoch_rsi(closes)
 
-    if state["ichimoku"]:
-        up, down = ichimoku(highs, lows, closes)
-    else:
-        up, down = True, True
+    peaks = swing_highs(highs)
+    bottoms = swing_lows(lows)
 
-    signal = "NONE"
+    stoch_array = np.full(len(highs), stoch)
 
-    if up and stoch < state["stoch_oversold"]:
-        signal = "LONG"
+    trend_up, trend_down = ichimoku(highs, lows, closes)
 
-    if down and stoch > state["stoch_overbought"]:
-        signal = "SHORT"
+    signals = []
+
+    # ================= SHORT =================
+    if state["ichimoku"] and trend_down:
+        if bearish_divergence(peaks, stoch_array) and stoch > state["stoch_overbought"]:
+            signals.append("🔴 TÍN HIỆU BÁN - ĐẢO CHIỀU GIẢM")
+
+    # ================= LONG =================
+    if state["ichimoku"] and trend_up:
+        if bullish_divergence(bottoms, stoch_array) and stoch < state["stoch_oversold"]:
+            signals.append("🟢 TÍN HIỆU MUA - ĐẢO CHIỀU TĂNG")
 
     return {
         "symbol": symbol,
-        "price": price,
         "stoch": round(stoch, 2),
-        "signal": signal
+        "signals": signals
     }
