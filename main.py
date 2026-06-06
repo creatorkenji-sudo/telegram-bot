@@ -4,6 +4,7 @@
 import time
 import asyncio
 from telegram import Bot
+import threading
 
 from data import get_klines
 from trend import multi_trend, detect_kumo_cross
@@ -78,15 +79,14 @@ def loop():
 
 
 def main():
-    # Gửi tin khởi động
-    run_telegram()
-
-    time.sleep(3)
-
     send(format_startup(state["symbols"]))
-    
+
     print(f"🚀 Bot chạy | {state['symbols']} | interval={CHECK_INTERVAL}s")
 
+    # Telegram chạy thread riêng
+    threading.Thread(target=run_telegram, daemon=True).start()
+
+    # scanner chạy main thread
     while True:
         print(f"\n[{time.strftime('%H:%M:%S')}] ── Kiểm tra ──")
         loop()

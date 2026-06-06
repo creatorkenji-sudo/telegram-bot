@@ -79,20 +79,14 @@ async def cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 # ── Chạy polling trong thread riêng ─────────────────────────
+app = ApplicationBuilder().token(TOKEN).build()
+
+app.add_handler(CommandHandler("start", cmd_start))
+app.add_handler(CommandHandler("add", cmd_add))
+app.add_handler(CommandHandler("remove", cmd_remove))
+app.add_handler(CommandHandler("list", cmd_list))
+app.add_handler(CommandHandler("status", cmd_status))
+
 def run_telegram():
-    def _run():
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-
-        app = ApplicationBuilder().token(TOKEN).build()
-
-        app.add_handler(CommandHandler("start",  cmd_start))
-        app.add_handler(CommandHandler("add",    cmd_add))
-        app.add_handler(CommandHandler("remove", cmd_remove))
-        app.add_handler(CommandHandler("list",   cmd_list))
-        app.add_handler(CommandHandler("status", cmd_status))
-        print("✅ Telegram bot polling...")
-        app.run_polling()
-
-    t = threading.Thread(target=_run, daemon=True)
-    t.start()
+    print("✅ Telegram bot polling...")
+    app.run_polling()
