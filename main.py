@@ -89,8 +89,10 @@ def scan_market():
 
 while True:
     try:
-        if now - last_heartbeat > state["heartbeat_interval"]:
+        now = time.time()
 
+        if now - last_heartbeat > state["heartbeat_interval"]:
+         
          send(
             "💓 BOT VẪN ĐANG HOẠT ĐỘNG\n"
             f"🔄 Số lần quét: {state['scan_count']}\n"
@@ -99,8 +101,6 @@ while True:
         last_heartbeat = now
 
         get_updates()
-
-        now = time.time()
 
         if now - last_report > state["report_interval"]:
             scan_market()
