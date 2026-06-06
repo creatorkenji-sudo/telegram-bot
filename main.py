@@ -71,73 +71,63 @@ def scan_single_coin(symbol):
     send(msg)
  # ================= SCAN MARKET =================
 def scan_market():
+
     state["scan_count"] += 1
-    msg = "📊 BÁO CÁO THỊ TRƯỜNG (M15 / H1 / H4 / D1)\n\n"
+
+    log_info("Bắt đầu scan market")
+
+    setup_found = False  # 👈 quan trọng: kiểm soát có signal hay không
 
     for symbol in SYMBOLS:
 
         for tf_name, tf in TIMEFRAMES.items():
 
-            log_info(f"Đang quét {symbol} {tf_name}")   
+            log_info(f"Đang quét {symbol} {tf_name}")
 
             highs, lows, closes = get_klines(symbol, tf)
 
             result = analyze(symbol, tf, highs, lows, closes, state)
 
-            msg += f"🪙 {symbol} | {tf_name}\n"
-            msg += f"📊 StochRSI: {result['stoch']}\n"
+            stoch = result["stoch"]
 
-            if result["signals"]:
+            # ================= KHÔNG CÒN REPORT RÁC =================
+            # chỉ log nội bộ, không gửi Telegram
+            log_info(f"{symbol} {tf_name} StochRSI={stoch}")
 
-                for signal in result["signals"]:
+            # ================= CHỈ XỬ LÝ SIGNAL =================
+            if not result["signals"]:
+                continue
 
-                    # ================= LONG ENTRY =================
-                    if signal == "LONG_ENTRY":
-                        send(
-                            format_long_entry(
-                                symbol,
-                                tf_name,
-                                result['stoch']
-                            )
-                        )
+            for signal in result["signals"]:
 
-                    # ================= SHORT ENTRY =================
-                    elif signal == "SHORT_ENTRY":
-                        send(
-                            format_short_entry(
-                                symbol,
-                                tf_name,
-                                result['stoch']
-                            )
-                        )
+                setup_found = True
 
-                    # ================= BULLISH REVERSAL =================
-                    elif signal == "BULLISH_REVERSAL":
-                        send(
-                            format_bullish_reversal(
-                                symbol,
-                                tf_name,
-                                result['stoch']
-                            )
-                        )
+                # ================= LONG =================
+                if signal == "LONG_ENTRY":
+                    send(
+                        format_long_entry(symbol, tf_name, stoch)
+                    )
 
-                    # ================= BEARISH REVERSAL =================
-                    elif signal == "BEARISH_REVERSAL":
-                        send(
-                            format_bearish_reversal(
-                                symbol,
-                                tf_name,
-                                result['stoch']
-                            )
-                        )
+                # ================= SHORT =================
+                elif signal == "SHORT_ENTRY":
+                    send(
+                        format_short_entry(symbol, tf_name, stoch)
+                    )
 
-            else:
-                msg += "Không có tín hiệu\n\n"
+                # ================= REVERSAL =================
+                elif signal == "BULLISH_REVERSAL":
+                    send(
+                        format_bullish_reversal(symbol, tf_name, stoch)
+                    )
 
-            msg += "\n"
+                elif signal == "BEARISH_REVERSAL":
+                    send(
+                        format_bearish_reversal(symbol, tf_name, stoch)
+                    )
 
-    send(msg)
-
+    # ================= CHỈ BÁO KHI CÓ SETUP =================
+    if not setup_found:
+        log_info("Không có setup nào")
  # ================= WHILE =================
 while True:
     try:
@@ -152,13 +142,16 @@ while True:
                 )
             last_heartbeat = now
 
+         # ================= TELEGRAM COMMAND =================
         get_updates()
 
+        # ================= MARKET SCAN =================
         if now - last_report > state["report_interval"]:
             scan_market()
             last_report = now
 
-        time.sleep(5)
+        # ================= CPU RELAX =================
+        time.sleep(2)
 
     except Exception as e:
         log_error(str(e))

@@ -15,3 +15,4 @@ state = {
 
     "scan_count": 0
 }
+state["active_timeframe"] = "15m"

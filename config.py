@@ -6,6 +6,7 @@ CHAT_ID = "7648621364"
 SYMBOLS = ["BTCUSDT", "ETHUSDT", "SOLUSDT"]
 
 TIMEFRAMES = {
+    "M5": "5m",
     "M15": "15m",
     "H1": "1h",
     "H4": "4h",
