@@ -1,21 +1,23 @@
 import requests
-import numpy as np
-from config import LIMIT
-
-BASE_URL = "https://api.binance.com/api/v3/klines"
-
+import pandas as pd
+from config import BASE_URL, LIMIT
 
 def get_klines(symbol, interval):
+    url = f"{BASE_URL}/v5/market/kline"
+
     params = {
+        "category": "linear",
         "symbol": symbol,
         "interval": interval,
         "limit": LIMIT
     }
 
-    data = requests.get(BASE_URL, params=params).json()
+    res = requests.get(url, params=params).json()
+    data = res["result"]["list"]
 
-    highs = np.array([float(x[2]) for x in data])
-    lows = np.array([float(x[3]) for x in data])
-    closes = np.array([float(x[4]) for x in data])
+    df = pd.DataFrame(data, columns=[
+        "timestamp","open","high","low","close","volume","turnover"
+    ])
 
-    return highs, lows, closes
+    df = df.astype(float)
+    return df[::-1]
