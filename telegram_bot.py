@@ -16,9 +16,16 @@ _bot = Bot(token=TOKEN)
 
 
 # ── Gửi tin nhắn (sync — gọi từ main loop) ──────────────────
-def send(text: str, chat_id: str = None):
+def send(text, chat_id=None):
     cid = chat_id or state["chat_id"]
-    asyncio.run(_bot.send_message(chat_id=cid, text=text))
+
+    loop = asyncio.new_event_loop()
+    try:
+        loop.run_until_complete(
+            _bot.send_message(chat_id=cid, text=text)
+        )
+    finally:
+        loop.close()
 
 
 # ── Command handlers (async — PTB v20) ──────────────────────
@@ -74,7 +81,11 @@ async def cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ── Chạy polling trong thread riêng ─────────────────────────
 def run_telegram():
     def _run():
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+
         app = ApplicationBuilder().token(TOKEN).build()
+
         app.add_handler(CommandHandler("start",  cmd_start))
         app.add_handler(CommandHandler("add",    cmd_add))
         app.add_handler(CommandHandler("remove", cmd_remove))

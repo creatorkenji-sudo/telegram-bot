@@ -17,8 +17,17 @@ _bot = Bot(token=TOKEN)
 
 
 def send(text: str):
-    """Gửi tin nhắn sync từ main loop."""
-    asyncio.run(_bot.send_message(chat_id=state["chat_id"], text=text))
+    loop = asyncio.new_event_loop()
+
+    try:
+        loop.run_until_complete(
+            _bot.send_message(
+                chat_id=state["chat_id"],
+                text=text
+            )
+        )
+    finally:
+        loop.close()
 
 
 def process_coin(symbol: str):
@@ -70,11 +79,12 @@ def loop():
 
 def main():
     # Gửi tin khởi động
-    send(format_startup(state["symbols"]))
-
-    # Chạy Telegram polling (thread riêng)
     run_telegram()
 
+    time.sleep(3)
+
+    send(format_startup(state["symbols"]))
+    
     print(f"🚀 Bot chạy | {state['symbols']} | interval={CHECK_INTERVAL}s")
 
     while True:
