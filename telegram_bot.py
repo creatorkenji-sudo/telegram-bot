@@ -27,11 +27,11 @@ def handle_command(text):
         parts = text.split()
 
         if len(parts) != 2:
-            return "Ví dụ:\n/tf M15\n/tf H1\n/tf H4\n/tf D1"
+            return "Ví dụ:\n/tf M5\n/tf M15\n/tf H1\n/tf H4\n/tf D1"
 
         tf = parts[1].lower()
 
-        valid = ["m15", "h1", "h4", "d1"]
+        valid = ["m5","m15", "h1", "h4", "d1"]
 
         if tf not in valid:
             return "Khung giờ không hợp lệ"
