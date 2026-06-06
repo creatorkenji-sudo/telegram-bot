@@ -1,6 +1,7 @@
 import time
 import requests
 
+from logger import log_info, log_error
 from config import SYMBOLS, TIMEFRAMES, TOKEN
 from data import get_klines
 from strategy import analyze
@@ -11,7 +12,8 @@ from state import state
 BASE_URL = f"https://api.telegram.org/bot"
 last_update = None
 last_report = 0
-
+last_heartbeat = 0
+state["scan_count"] += 1
 
 def get_updates():
     global last_update
@@ -38,6 +40,8 @@ def scan_market():
     for symbol in SYMBOLS:
 
         for tf_name, tf in TIMEFRAMES.items():
+
+            log_info(f"Đang quét {symbol} {tf_name}")   
 
             highs, lows, closes = get_klines(symbol, tf)
 
@@ -85,6 +89,15 @@ def scan_market():
 
 while True:
     try:
+        if now - last_heartbeat > state["heartbeat_interval"]:
+
+         send(
+            "💓 BOT VẪN ĐANG HOẠT ĐỘNG\n"
+            f"🔄 Số lần quét: {state['scan_count']}\n"
+            f"📊 Coins: {len(SYMBOLS)}"
+            )
+        last_heartbeat = now
+
         get_updates()
 
         now = time.time()
@@ -96,5 +109,5 @@ while True:
         time.sleep(5)
 
     except Exception as e:
-        print("ERROR:", e)
+        log_error(str(e))
         time.sleep(5)

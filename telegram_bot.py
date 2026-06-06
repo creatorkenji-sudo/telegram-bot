@@ -1,6 +1,6 @@
 import requests
 from config import TOKEN, CHAT_ID
-
+from state import state
 BASE = f"https://api.telegram.org/bot{TOKEN}"
 
 
@@ -12,10 +12,16 @@ def send(msg):
 
 
 def handle_command(text):
-
+    if text == "/status":
+        return (
+        "🟢 BOT ĐANG CHẠY\n\n"
+        f"🔄 Scan: {state['scan_count']}\n"
+        f"🚨 Alerts: {state['alerts']}\n"
+        f"☁️ Ichimoku: {state['ichimoku']}"
+    )
     if text == "/menu":
         return """📊 BẢNG ĐIỀU KHIỂN BOT
-
+    
 /settings - cài đặt
 /status - trạng thái bot
 /toggle_ichimoku - bật/tắt Ichimoku
