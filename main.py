@@ -1,7 +1,7 @@
 import time
 import requests
 
-from config import SYMBOLS, TIMEFRAMES
+from config import SYMBOLS, TIMEFRAMES, TOKEN
 from data import get_klines
 from strategy import analyze
 from telegram_bot import send, handle_command
