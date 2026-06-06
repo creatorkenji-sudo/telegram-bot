@@ -5,6 +5,8 @@ import time
 import asyncio
 from telegram import Bot
 
+import threading
+
 from data import get_klines
 from trend import multi_trend, detect_kumo_cross
 from entry import check_entry
@@ -78,21 +80,24 @@ def loop():
 
 
 def main():
-    # Gửi tin khởi động
-    run_telegram()
-
-    time.sleep(3)
-
     send(format_startup(state["symbols"]))
-    
+
     print(f"🚀 Bot chạy | {state['symbols']} | interval={CHECK_INTERVAL}s")
 
-    while True:
-        print(f"\n[{time.strftime('%H:%M:%S')}] ── Kiểm tra ──")
-        loop()
-        print(f"  ⏳ Chờ {CHECK_INTERVAL}s...")
-        time.sleep(CHECK_INTERVAL)
+    # Telegram chạy riêng thread
+    threading.Thread(target=run_telegram, daemon=True).start()
 
+    # Scanner chạy main thread
+    while True:
+        try:
+            print(f"\n[{time.strftime('%H:%M:%S')}] ── Kiểm tra ──")
+            loop()
+            print(f"  ⏳ Chờ {CHECK_INTERVAL}s...")
+
+        except Exception as e:
+            print("❌ ERROR:", e)
+
+        time.sleep(CHECK_INTERVAL)
 
 if __name__ == "__main__":
     main()
