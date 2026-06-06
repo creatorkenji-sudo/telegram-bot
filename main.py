@@ -7,18 +7,19 @@ from data import get_klines
 from strategy import analyze
 from telegram_bot import send, handle_command
 from state import state
+from formatter import *
 
-
-BASE_URL = f"https://api.telegram.org/bot"
+BASE_URL = f"https://api.telegram.org/bot{TOKEN}"
 last_update = None
 last_report = 0
 last_heartbeat = 0
-state["scan_count"] += 1
+
+
  # ================= GET UPDATE =================
 def get_updates():
     global last_update
 
-    url = f"{BASE_URL}{TOKEN}/getUpdates"
+    url = f"{BASE_URL}/getUpdates"
 
     if last_update:
         url += f"?offset={last_update + 1}"
@@ -70,6 +71,7 @@ def scan_single_coin(symbol):
     send(msg)
  # ================= SCAN MARKET =================
 def scan_market():
+    state["scan_count"] += 1
     msg = "📊 BÁO CÁO THỊ TRƯỜNG (M15 / H1 / H4 / D1)\n\n"
 
     for symbol in SYMBOLS:
@@ -85,37 +87,52 @@ def scan_market():
             msg += f"🪙 {symbol} | {tf_name}\n"
             msg += f"📊 StochRSI: {result['stoch']}\n"
 
-            # ================= TREND INFO =================
-            if "trend" in result:
-                msg += f"📈 Trend: {result['trend']}\n"
+            if result["signals"]:
 
-            # ================= SONG SONG ALERT SYSTEM =================
-            reversal_alerts = []
-            entry_alerts = []
+                for signal in result["signals"]:
 
-            for s in result["signals"]:
+                    # ================= LONG ENTRY =================
+                    if signal == "LONG_ENTRY":
+                        send(
+                            format_long_entry(
+                                symbol,
+                                tf_name,
+                                result['stoch']
+                            )
+                        )
 
-                # phân loại cảnh báo
-                if "ĐẢO CHIỀU" in s or "CẢNH BÁO" in s:
-                    reversal_alerts.append(s)
+                    # ================= SHORT ENTRY =================
+                    elif signal == "SHORT_ENTRY":
+                        send(
+                            format_short_entry(
+                                symbol,
+                                tf_name,
+                                result['stoch']
+                            )
+                        )
 
-                elif "ENTRY" in s or "TREND" in s:
-                    entry_alerts.append(s)
+                    # ================= BULLISH REVERSAL =================
+                    elif signal == "BULLISH_REVERSAL":
+                        send(
+                            format_bullish_reversal(
+                                symbol,
+                                tf_name,
+                                result['stoch']
+                            )
+                        )
 
-            # ================= OUTPUT REVERSAL =================
-            if reversal_alerts:
-                msg += "⚠️ ĐẢO CHIỀU TIỀM NĂNG:\n"
-                for r in reversal_alerts:
-                    msg += f"{r}\n"
+                    # ================= BEARISH REVERSAL =================
+                    elif signal == "BEARISH_REVERSAL":
+                        send(
+                            format_bearish_reversal(
+                                symbol,
+                                tf_name,
+                                result['stoch']
+                            )
+                        )
 
-            # ================= OUTPUT ENTRY =================
-            if entry_alerts:
-                msg += "🟢 TÍN HIỆU VÀO LỆNH:\n"
-                for e in entry_alerts:
-                    msg += f"{e}\n"
-
-            if not reversal_alerts and not entry_alerts:
-                msg += "Không có tín hiệu\n"
+            else:
+                msg += "Không có tín hiệu\n\n"
 
             msg += "\n"
 
@@ -128,12 +145,12 @@ while True:
 
         if now - last_heartbeat > state["heartbeat_interval"]:
          
-         send(
-            "💓 BOT VẪN ĐANG HOẠT ĐỘNG\n"
-            f"🔄 Số lần quét: {state['scan_count']}\n"
-            f"📊 Coins: {len(SYMBOLS)}"
-            )
-        last_heartbeat = now
+            send(
+                "💓 BOT VẪN ĐANG HOẠT ĐỘNG\n"
+                f"🔄 Số lần quét: {state['scan_count']}\n"
+                f"📊 Coins: {len(SYMBOLS)}"
+                )
+            last_heartbeat = now
 
         get_updates()
 

@@ -21,11 +21,11 @@ def analyze(symbol, interval, highs, lows, closes, state):
 
     if state["ichimoku"] and trend_down:
         if bearish_divergence(peaks, stoch_array) and stoch > state["stoch_overbought"]:
-            signals.append("⚠️ ĐẢO CHIỀU GIẢM TIỀM NĂNG - CẢNH BÁO BÁN")
+            signals.append("BEARISH_REVERSAL")
 
     if state["ichimoku"] and trend_up:
         if bullish_divergence(bottoms, stoch_array) and stoch < state["stoch_oversold"]:
-            signals.append("⚠️ ĐẢO CHIỀU TĂNG TIỀM NĂNG - CẢNH BÁO MUA")
+            signals.append("BULLISH_REVERSAL")
 
     # =========================================
     # 2. TREND + PULLBACK ENTRY (THÊM MỚI)
@@ -34,12 +34,12 @@ def analyze(symbol, interval, highs, lows, closes, state):
     # LONG ENTRY
     if trend_up:
         if stoch < state["stoch_oversold"]:
-            signals.append("🟢 LONG ENTRY - TREND UP + PULLBACK (M15/H1)")
+            signals.append("LONG_ENTRY")
 
     # SHORT ENTRY
     if trend_down:
         if stoch > state["stoch_overbought"]:
-            signals.append("🔴 SHORT ENTRY - TREND DOWN + RETEST (M15/H1)")
+            signals.append("SHORT_ENTRY")
 
     return {
         "symbol": symbol,
