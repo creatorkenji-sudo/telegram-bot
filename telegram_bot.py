@@ -19,14 +19,23 @@ def handle_command(text):
         f"🚨 Alerts: {state['alerts']}\n"
         f"☁️ Ichimoku: {state['ichimoku']}"
     )
+    
+    if text.startswith("/report"):
+        parts = text.split()
+
+        if len(parts) != 2:
+            return "Ví dụ:\n/report BTC\n/report ETH\n/report SOL"
+
+        return f"__REPORT__:{parts[1].upper()}"
+    
     if text == "/menu":
         return """📊 BẢNG ĐIỀU KHIỂN BOT
     
-/settings - cài đặt
-/status - trạng thái bot
-/toggle_ichimoku - bật/tắt Ichimoku
-/toggle_alerts - bật/tắt cảnh báo
-"""
+        /settings - cài đặt
+        /status - trạng thái bot
+        /toggle_ichimoku - bật/tắt Ichimoku
+        /toggle_alerts - bật/tắt cảnh báo
+        """
 
     if text == "/status":
         return "🟢 Bot đang hoạt động bình thường"

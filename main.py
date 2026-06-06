@@ -14,7 +14,7 @@ last_update = None
 last_report = 0
 last_heartbeat = 0
 state["scan_count"] += 1
-
+ # ================= GET UPDATE =================
 def get_updates():
     global last_update
 
@@ -31,9 +31,44 @@ def get_updates():
         if "message" in msg:
             text = msg["message"]["text"]
             reply = handle_command(text)
-            send(reply)
+            if reply.startswith("__REPORT__:"):
+                coin = reply.split(":")[1]
+                symbol = f"{coin}USDT"
+                scan_single_coin(symbol)
+            else:
+                send(reply)
+ # ================= SCAN SINGLE COIN =================
+def scan_single_coin(symbol):
 
+    msg = f"📊 PHÂN TÍCH {symbol}\n\n"
 
+    for tf_name, tf in TIMEFRAMES.items():
+
+        highs, lows, closes = get_klines(symbol, tf)
+
+        result = analyze(
+            symbol,
+            tf,
+            highs,
+            lows,
+            closes,
+            state
+        )
+
+        msg += f"⏰ {tf_name}\n"
+        msg += f"📊 StochRSI: {result['stoch']}\n"
+
+        if "trend" in result:
+            msg += f"📈 Trend: {result['trend']}\n"
+
+        if result["signals"]:
+            for s in result["signals"]:
+                msg += f"{s}\n"
+
+        msg += "\n"
+
+    send(msg)
+ # ================= SCAN MARKET =================
 def scan_market():
     msg = "📊 BÁO CÁO THỊ TRƯỜNG (M15 / H1 / H4 / D1)\n\n"
 
@@ -86,7 +121,7 @@ def scan_market():
 
     send(msg)
 
-
+ # ================= WHILE =================
 while True:
     try:
         now = time.time()
