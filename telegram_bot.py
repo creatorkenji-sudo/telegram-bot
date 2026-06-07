@@ -85,6 +85,9 @@ def cmd_strategies(update, context):
 
 def run_telegram():
     updater = Updater(TOKEN, use_context=True)
+    # Xóa webhook cũ trước khi polling — tránh conflict
+    updater.bot.delete_webhook(drop_pending_updates=True)
+    
     dp = updater.dispatcher
 
     dp.add_handler(CommandHandler("start",      cmd_start))
