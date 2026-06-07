@@ -53,7 +53,7 @@ def cmd_list(update, context):
 
 
 def cmd_status(update, context):
-    update.message.reply_text(format_status(state["symbols"]))
+    update.message.reply_text(format_status(state["symbols"], state["strategies"]))
 
 
 def cmd_strategy_a(update, context):

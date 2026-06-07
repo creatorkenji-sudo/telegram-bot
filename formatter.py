@@ -8,7 +8,7 @@ _TZ_VN = timezone(timedelta(hours=7))   # UTC+7 Việt Nam
 
 
 def _now():
-    return datetime.now(_TZ_VN).strftime("%d/%m %H:%M")
+    return datetime.now(_TZ_VN).strftime("%d/%m %H:%M") + " (UTC+7)"
 
 
 # ════════════════════════════════════════════════════════════
@@ -28,7 +28,8 @@ def format_kumo_cross(symbol: str, direction: str, price: float, timeframe: str)
         signal = "🐻 Tín hiệu GIẢM — chờ xác nhận entry"
     return (
         f"{bar}\n{title}\n"
-        f"⏰ Khung: {timeframe}  ·  🕐 {_now()}\n"
+        f"🕐 {_now()}\n"
+        f"⏰ Khung: {timeframe}\n"
         f"━━━━━━━━━━━━━━━━━━━━\n"
         f"💰 Giá hiện tại : {price:,.4f} USDT\n"
         f"{desc}\n{signal}\n"
@@ -46,16 +47,17 @@ def format_ichimoku_entry(symbol: str, trend: str, timeframe: str, setup: dict) 
     tp_pct = abs(round((tp - entry) / entry * 100, 2))
 
     if setup["type"] == "LONG":
-        bar    = "🟢══════════════════🟢"
-        title  = f"🚀  VÀO LỆNH LONG — {coin}/USDT"
+        bar     = "🟢══════════════════🟢"
+        title   = f"🚀  VÀO LỆNH LONG — {coin}/USDT"
         trend_l = "📈 Xu hướng: TĂNG 🐂  (H4 + H1)"
     else:
-        bar    = "🔴══════════════════🔴"
-        title  = f"📉  VÀO LỆNH SHORT — {coin}/USDT"
+        bar     = "🔴══════════════════🔴"
+        title   = f"📉  VÀO LỆNH SHORT — {coin}/USDT"
         trend_l = "📉 Xu hướng: GIẢM 🐻  (H4 + H1)"
     return (
         f"{bar}\n{title}\n"
-        f"⏰ Khung vào lệnh: {timeframe}  ·  🕐 {_now()}\n"
+        f"🕐 {_now()}\n"
+        f"⏰ Khung vào lệnh: {timeframe}\n"
         f"━━━━━━━━━━━━━━━━━━━━\n"
         f"💰 Giá hiện tại  : {entry:,.4f} USDT\n"
         f"📍 Điểm vào      : {entry:,.4f}\n"
@@ -80,26 +82,24 @@ def format_ema_signal(symbol: str, sig: dict) -> str:
     entry = sig["entry"]
 
     if sig["type"] == "LONG":
-        bar    = "📈🟢══════════════════🟢📈"
-        title  = f"🚀  EMA PULLBACK LONG — {coin}/USDT"
+        bar     = "📈🟢══════════════════🟢📈"
+        title   = f"🚀  EMA PULLBACK LONG — {coin}/USDT"
         trend_l = "🐂 Xu hướng H1: TĂNG  (EMA20 > EMA50)"
-        sl_icon = "🛡"
     else:
-        bar    = "📉🔴══════════════════🔴📉"
-        title  = f"💥  EMA PULLBACK SHORT — {coin}/USDT"
+        bar     = "📉🔴══════════════════🔴📉"
+        title   = f"💥  EMA PULLBACK SHORT — {coin}/USDT"
         trend_l = "🐻 Xu hướng H1: GIẢM  (EMA20 < EMA50)"
-        sl_icon = "🛡"
 
-    # Hiện điều kiện đã pass
     passed_str = " · ".join(f"✅ {p}" for p in sig["passed"])
 
     return (
         f"{bar}\n{title}\n"
-        f"⏰ Khung: H1 + 15m  ·  🕐 {_now()}\n"
+        f"🕐 {_now()}\n"
+        f"⏰ Khung: H1 + 15m\n"
         f"━━━━━━━━━━━━━━━━━━━━\n"
         f"💰 Giá hiện tại  : {entry:,.4f} USDT\n"
         f"📍 Điểm vào      : {entry:,.4f}\n"
-        f"{sl_icon} Cắt lỗ (SL)  : {sig['sl']:,.4f}  (−{sig['sl_pct']}%)\n"
+        f"🛡 Cắt lỗ (SL)  : {sig['sl']:,.4f}  (−{sig['sl_pct']}%)\n"
         f"🎯 Chốt lời (TP) : {sig['tp']:,.4f}  (+{sig['tp_pct']}%)\n"
         f"⚖️ R:R            : 1:{RR_RATIO}\n"
         f"━━━━━━━━━━━━━━━━━━━━\n"
@@ -124,6 +124,7 @@ def format_startup(symbols: list) -> str:
     coins = " · ".join(s.replace("USDT", "") for s in symbols)
     return (
         f"✅  BOT CRYPTO ALERT BẬT\n"
+        f"🕐 {_now()}\n"
         f"━━━━━━━━━━━━━━━━━━━━\n"
         f"📊 Theo dõi  : {coins}\n"
         f"☁️  Chiến lược A : Ichimoku + StochRSI\n"
@@ -135,16 +136,31 @@ def format_startup(symbols: list) -> str:
     )
 
 
-def format_status(symbols: list) -> str:
+def format_status(symbols: list, strategies: dict = None) -> str:
+    """Hiện trạng thái bot + chiến lược đang bật/tắt."""
     coins = "\n".join(f"  • {s}" for s in symbols) if symbols else "  (Trống)"
+
+    if strategies:
+        a = "✅ BẬT" if strategies.get("ichimoku") else "❌ TẮT"
+        b = "✅ BẬT" if strategies.get("ema")      else "❌ TẮT"
+        strat_block = (
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"⚙️  Chiến lược:\n"
+            f"  ☁️  A — Ichimoku + StochRSI : {a}\n"
+            f"  📈 B — EMA Pullback + MACD  : {b}\n"
+        )
+    else:
+        strat_block = ""
+
     return (
         f"📋  TRẠNG THÁI BOT\n"
+        f"🕐 {_now()}\n"
         f"━━━━━━━━━━━━━━━━━━━━\n"
         f"🔍 Đang theo dõi:\n{coins}\n"
+        f"{strat_block}"
         f"━━━━━━━━━━━━━━━━━━━━\n"
         f"⚖️ R:R = 1:{RR_RATIO}  ·  SL {SL_PERCENT}%\n"
-        f"⏱ H4 + H1 + 15m\n"
-        f"🕐 {_now()}"
+        f"⏱ Khung: H4 + H1 + 15m"
     )
 
 
@@ -154,8 +170,8 @@ def format_heartbeat(symbols: list, strategies: dict) -> str:
     b = "✅" if strategies.get("ema")      else "❌"
     return (
         f"💚  BOT ĐANG HOẠT ĐỘNG\n"
-        f"━━━━━━━━━━━━━━━━━━━━\n"
         f"🕐 {_now()}\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
         f"📊 Theo dõi : {coins}\n"
         f"☁️  CL A Ichimoku : {a}\n"
         f"📈 CL B EMA+MACD  : {b}\n"
