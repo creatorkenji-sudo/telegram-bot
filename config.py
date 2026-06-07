@@ -2,7 +2,7 @@
 #  config.py — Toàn bộ cấu hình tại đây
 # ============================================================
 
-TOKEN   = "8965760476:AAGkOaVyGQ4IP-iBVKRqkGl76K-_fx5tS-g"
+TOKEN   = "8965760476:AAHPcQYrJcse8Pk_8ynb7shJxTdmZVA-Qd8"
 CHAT_ID = "7648621364"
 
 # Danh sách coin mặc định khi khởi động (thêm/xóa qua Telegram)
