@@ -1,57 +1,105 @@
 # ============================================================
-#  main.py — Vòng lặp chính + heartbeat mỗi 1 giờ
+#  main.py — Chạy hoàn toàn async, không dùng threading
 # ============================================================
-import time
 import asyncio
+import time
+from datetime import datetime
 from telegram import Bot
+from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
+from telegram import Update
 
 from data import get_klines
 from trend import multi_trend, detect_kumo_cross
 from entry import check_entry
-from telegram_bot import run_telegram
 from formatter import (
     format_entry, format_kumo_cross,
-    format_startup, format_heartbeat
+    format_startup, format_status,
+    format_heartbeat
 )
-from state import state
+from state import state, add_symbol, remove_symbol
 from config import CHECK_INTERVAL, TIMEFRAMES, TOKEN
 
-_bot = Bot(token=TOKEN)
+# ── Bot instance dùng chung ──────────────────────────────────
+bot = Bot(token=TOKEN)
 
 
-def send(text: str):
-    """Gửi tin nhắn sync từ main loop."""
-    asyncio.run(_bot.send_message(chat_id=state["chat_id"], text=text))
+# ── Gửi tin nhắn (async) ─────────────────────────────────────
+async def send(text: str):
+    await bot.send_message(chat_id=state["chat_id"], text=text)
 
 
-def process_coin(symbol: str):
-    # 1. Lấy dữ liệu 3 khung giờ
+# ── Telegram command handlers ────────────────────────────────
+async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(format_startup(state["symbols"]))
+
+async def cmd_add(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not context.args:
+        await update.message.reply_text("❌ Dùng: /add BTCUSDT")
+        return
+    symbol = context.args[0].upper()
+    if not symbol.endswith("USDT"):
+        symbol += "USDT"
+    if add_symbol(symbol):
+        await update.message.reply_text(
+            f"✅ Đã thêm {symbol}\n"
+            f"📋 Danh sách: {', '.join(state['symbols'])}"
+        )
+    else:
+        await update.message.reply_text(f"⚠️ {symbol} đã có trong danh sách rồi")
+
+async def cmd_remove(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not context.args:
+        await update.message.reply_text("❌ Dùng: /remove BTCUSDT")
+        return
+    symbol = context.args[0].upper()
+    if not symbol.endswith("USDT"):
+        symbol += "USDT"
+    if remove_symbol(symbol):
+        remaining = ', '.join(state['symbols']) if state['symbols'] else "Trống"
+        await update.message.reply_text(
+            f"🗑 Đã xóa {symbol}\n"
+            f"📋 Còn lại: {remaining}"
+        )
+    else:
+        await update.message.reply_text(f"⚠️ {symbol} không có trong danh sách")
+
+async def cmd_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not state["symbols"]:
+        await update.message.reply_text("📋 Danh sách trống. Thêm bằng /add BTCUSDT")
+        return
+    coins = "\n".join(f"  • {s}" for s in state["symbols"])
+    await update.message.reply_text(f"📋 Đang theo dõi:\n{coins}")
+
+async def cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(format_status(state["symbols"]))
+
+
+# ── Xử lý từng coin ─────────────────────────────────────────
+async def process_coin(symbol: str):
     df_h4  = get_klines(symbol, TIMEFRAMES["h4"])
     df_h1  = get_klines(symbol, TIMEFRAMES["h1"])
     df_m15 = get_klines(symbol, TIMEFRAMES["m15"])
 
     price = df_m15["close"].iloc[-1]
-
-    # 2. Xu hướng H4 + H1
     trend = multi_trend(df_h4, df_h1)
 
-    # 3. Kumo Cross H1 — chỉ báo 1 lần
+    # Kumo Cross H1 — chỉ báo 1 lần
     kumo = detect_kumo_cross(df_h1)
     if kumo and kumo != state["last_kumo_cross"].get(symbol):
-        send(format_kumo_cross(symbol, kumo, price, "H1"))
+        await send(format_kumo_cross(symbol, kumo, price, "H1"))
         state["last_kumo_cross"][symbol] = kumo
         print(f"  ☁️  {symbol}: Kumo Cross {kumo} — đã gửi")
     elif not kumo:
         state["last_kumo_cross"][symbol] = None
 
-    # 4. Entry 15m — chỉ khi H4+H1 đồng thuận
+    # Entry 15m — chỉ khi H4+H1 đồng thuận
     if trend == "NO_TREND":
-        print(f"  ⏭  {symbol}: H4+H1 không đồng thuận — bỏ qua")
+        print(f"  ⏭  {symbol}: không đồng thuận — bỏ qua")
         return
 
     setup = check_entry(df_m15, trend)
     if setup and setup["type"] != state["last_entry_signal"].get(symbol):
-        send(format_entry(symbol, trend, "15m", setup))
+        await send(format_entry(symbol, trend, "15m", setup))
         state["last_entry_signal"][symbol] = setup["type"]
         print(f"  📍 {symbol}: {setup['type']} ${setup['entry']} — đã gửi")
     elif not setup:
@@ -59,49 +107,64 @@ def process_coin(symbol: str):
         print(f"  —  {symbol}: trend={trend} | ${price:,.4f} | chưa có setup")
 
 
-def loop():
-    symbols = list(state["symbols"])
-    if not symbols:
-        print("  ⚠️  Danh sách trống. Dùng /add BTCUSDT")
-        return
-    for symbol in symbols:
-        try:
-            process_coin(symbol)
-        except Exception as e:
-            print(f"  ❌ {symbol}: {e}")
-
-
-def main():
-    # Gửi tin khởi động
-    send(format_startup(state["symbols"]))
-
-    # Chạy Telegram polling (thread riêng)
-    run_telegram()
-
-    print(f"🚀 Bot chạy | {state['symbols']} | interval={CHECK_INTERVAL}s")
-
+# ── Vòng lặp quét tín hiệu ──────────────────────────────────
+async def scanner_loop():
     last_heartbeat = time.time()
-    HEARTBEAT_INTERVAL = 3600   # 1 giờ = 3600 giây
+    HEARTBEAT_INTERVAL = 3600   # 1 giờ
 
     while True:
-        now = time.time()
-        print(f"\n[{time.strftime('%H:%M:%S')}] ── Kiểm tra ──")
+        print(f"\n[{datetime.now().strftime('%H:%M:%S')}] ── Kiểm tra ──")
 
-        # Kiểm tra tín hiệu
-        loop()
+        symbols = list(state["symbols"])
+        if not symbols:
+            print("  ⚠️  Danh sách trống. Dùng /add BTCUSDT")
+        else:
+            for symbol in symbols:
+                try:
+                    await process_coin(symbol)
+                except Exception as e:
+                    print(f"  ❌ {symbol}: {e}")
 
         # Heartbeat mỗi 1 giờ
-        if now - last_heartbeat >= HEARTBEAT_INTERVAL:
+        if time.time() - last_heartbeat >= HEARTBEAT_INTERVAL:
             try:
-                send(format_heartbeat(state["symbols"]))
+                await send(format_heartbeat(state["symbols"]))
                 print("  💚 Heartbeat gửi OK")
             except Exception as e:
                 print(f"  ❌ Heartbeat lỗi: {e}")
-            last_heartbeat = now
+            last_heartbeat = time.time()
 
         print(f"  ⏳ Chờ {CHECK_INTERVAL}s...")
-        time.sleep(CHECK_INTERVAL)
+        await asyncio.sleep(CHECK_INTERVAL)
+
+
+# ── Main: chạy scanner + Telegram polling song song ─────────
+async def main():
+    # Khởi động Telegram app
+    app = ApplicationBuilder().token(TOKEN).build()
+    app.add_handler(CommandHandler("start",  cmd_start))
+    app.add_handler(CommandHandler("add",    cmd_add))
+    app.add_handler(CommandHandler("remove", cmd_remove))
+    app.add_handler(CommandHandler("list",   cmd_list))
+    app.add_handler(CommandHandler("status", cmd_status))
+
+    # Gửi tin khởi động
+    await send(format_startup(state["symbols"]))
+    print(f"🚀 Bot chạy | {state['symbols']} | interval={CHECK_INTERVAL}s")
+    print("✅ Telegram bot polling...")
+
+    # Chạy song song: polling + scanner
+    async with app:
+        await app.start()
+        await app.updater.start_polling()
+
+        # Chạy scanner loop
+        await scanner_loop()
+
+        # Dừng (sẽ không bao giờ tới đây trừ khi có lỗi)
+        await app.updater.stop()
+        await app.stop()
 
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
