@@ -1,35 +1,27 @@
 # ============================================================
-#  main.py — Vòng lặp chính (PTB v20 compatible)
+#  main.py — Vòng lặp chính + heartbeat mỗi 1 giờ
 # ============================================================
 import time
 import asyncio
 from telegram import Bot
 
-import threading
-
 from data import get_klines
 from trend import multi_trend, detect_kumo_cross
 from entry import check_entry
 from telegram_bot import run_telegram
-from formatter import format_entry, format_kumo_cross, format_startup
+from formatter import (
+    format_entry, format_kumo_cross,
+    format_startup, format_heartbeat
+)
 from state import state
-from config import CHECK_INTERVAL, TIMEFRAMES, TOKEN, CHAT_ID
+from config import CHECK_INTERVAL, TIMEFRAMES, TOKEN
 
 _bot = Bot(token=TOKEN)
 
 
 def send(text: str):
-    loop = asyncio.new_event_loop()
-
-    try:
-        loop.run_until_complete(
-            _bot.send_message(
-                chat_id=state["chat_id"],
-                text=text
-            )
-        )
-    finally:
-        loop.close()
+    """Gửi tin nhắn sync từ main loop."""
+    asyncio.run(_bot.send_message(chat_id=state["chat_id"], text=text))
 
 
 def process_coin(symbol: str):
@@ -64,7 +56,7 @@ def process_coin(symbol: str):
         print(f"  📍 {symbol}: {setup['type']} ${setup['entry']} — đã gửi")
     elif not setup:
         state["last_entry_signal"][symbol] = None
-        print(f"  —  {symbol}: trend={trend} | giá=${price:,.4f} | chưa có setup")
+        print(f"  —  {symbol}: trend={trend} | ${price:,.4f} | chưa có setup")
 
 
 def loop():
@@ -80,24 +72,36 @@ def loop():
 
 
 def main():
+    # Gửi tin khởi động
     send(format_startup(state["symbols"]))
+
+    # Chạy Telegram polling (thread riêng)
+    run_telegram()
 
     print(f"🚀 Bot chạy | {state['symbols']} | interval={CHECK_INTERVAL}s")
 
-    # Telegram chạy riêng thread
-    threading.Thread(target=run_telegram, daemon=True).start()
+    last_heartbeat = time.time()
+    HEARTBEAT_INTERVAL = 3600   # 1 giờ = 3600 giây
 
-    # Scanner chạy main thread
     while True:
-        try:
-            print(f"\n[{time.strftime('%H:%M:%S')}] ── Kiểm tra ──")
-            loop()
-            print(f"  ⏳ Chờ {CHECK_INTERVAL}s...")
+        now = time.time()
+        print(f"\n[{time.strftime('%H:%M:%S')}] ── Kiểm tra ──")
 
-        except Exception as e:
-            print("❌ ERROR:", e)
+        # Kiểm tra tín hiệu
+        loop()
 
+        # Heartbeat mỗi 1 giờ
+        if now - last_heartbeat >= HEARTBEAT_INTERVAL:
+            try:
+                send(format_heartbeat(state["symbols"]))
+                print("  💚 Heartbeat gửi OK")
+            except Exception as e:
+                print(f"  ❌ Heartbeat lỗi: {e}")
+            last_heartbeat = now
+
+        print(f"  ⏳ Chờ {CHECK_INTERVAL}s...")
         time.sleep(CHECK_INTERVAL)
+
 
 if __name__ == "__main__":
     main()
