@@ -6,7 +6,7 @@ TOKEN   = "8965760476:AAHPcQYrJcse8Pk_8ynb7shJxTdmZVA-Qd8"
 CHAT_ID = "7648621364"
 
 # Danh sách coin mặc định khi khởi động (thêm/xóa qua Telegram)
-DEFAULT_SYMBOLS = ["HYPEUSDT", "NEARUSDT"]
+DEFAULT_SYMBOLS = ["BTCUSDT", "ETHUSDT"]
 
 # Bybit
 BASE_URL = "https://api.bybit.com"
