@@ -1,5 +1,8 @@
+# ============================================================
+#  telegram_bot.py — Commands Telegram (PTB 13.x)
+# ============================================================
 from telegram.ext import Updater, CommandHandler
-from state import state, add_symbol, remove_symbol
+from state import state, add_symbol, remove_symbol, toggle_strategy, strategy_status
 from config import TOKEN
 from formatter import format_startup, format_status
 
@@ -53,13 +56,45 @@ def cmd_status(update, context):
     update.message.reply_text(format_status(state["symbols"]))
 
 
+def cmd_strategy_a(update, context):
+    """Bật/tắt Chiến lược A (Ichimoku + StochRSI)."""
+    new_state = toggle_strategy("ichimoku")
+    icon  = "✅ BẬT" if new_state else "❌ TẮT"
+    update.message.reply_text(
+        f"☁️  Chiến lược A — Ichimoku + StochRSI\n"
+        f"Trạng thái mới: {icon}\n\n"
+        f"{strategy_status()}"
+    )
+
+
+def cmd_strategy_b(update, context):
+    """Bật/tắt Chiến lược B (EMA Pullback + MACD)."""
+    new_state = toggle_strategy("ema")
+    icon  = "✅ BẬT" if new_state else "❌ TẮT"
+    update.message.reply_text(
+        f"📈 Chiến lược B — EMA Pullback + MACD\n"
+        f"Trạng thái mới: {icon}\n\n"
+        f"{strategy_status()}"
+    )
+
+
+def cmd_strategies(update, context):
+    """Xem trạng thái tất cả chiến lược."""
+    update.message.reply_text(strategy_status())
+
+
 def run_telegram():
     updater = Updater(TOKEN, use_context=True)
     dp = updater.dispatcher
-    dp.add_handler(CommandHandler("start",  cmd_start))
-    dp.add_handler(CommandHandler("add",    cmd_add))
-    dp.add_handler(CommandHandler("remove", cmd_remove))
-    dp.add_handler(CommandHandler("list",   cmd_list))
-    dp.add_handler(CommandHandler("status", cmd_status))
+
+    dp.add_handler(CommandHandler("start",      cmd_start))
+    dp.add_handler(CommandHandler("add",        cmd_add))
+    dp.add_handler(CommandHandler("remove",     cmd_remove))
+    dp.add_handler(CommandHandler("list",       cmd_list))
+    dp.add_handler(CommandHandler("status",     cmd_status))
+    dp.add_handler(CommandHandler("strategy_a", cmd_strategy_a))
+    dp.add_handler(CommandHandler("strategy_b", cmd_strategy_b))
+    dp.add_handler(CommandHandler("strategies", cmd_strategies))
+
     updater.start_polling()
     print("✅ Telegram bot polling...")
