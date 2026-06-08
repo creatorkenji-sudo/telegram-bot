@@ -176,3 +176,46 @@ def format_heartbeat(symbols_a: list, symbols_b: list, strategies: dict) -> str:
 # Alias
 format_entry = format_ichimoku_entry
 format_setup = format_ichimoku_entry
+
+
+# ════════════════════════════════════════════════════════════
+#  CHIẾN LƯỢC C — Supertrend + Confirmation
+# ════════════════════════════════════════════════════════════
+def format_strategy_c(symbol: str, sig: dict) -> str:
+    coin  = symbol.replace("USDT", "")
+    entry = sig["entry"]
+
+    if sig["type"] == "LONG":
+        bar   = "⚡🟢══════════════════🟢⚡"
+        title = f"🚀  SUPERTREND LONG — {coin}/USDT"
+        tl    = "🐂 Xu hướng: TĂNG  (Supertrend H1)"
+    else:
+        bar   = "⚡🔴══════════════════🔴⚡"
+        title = f"💥  SUPERTREND SHORT — {coin}/USDT"
+        tl    = "🐻 Xu hướng: GIẢM  (Supertrend H1)"
+
+    confirms_str = (
+        " · ".join(f"✅ {p}" for p in sig["passed"])
+        if sig["passed"] else "⚡ Supertrend only"
+    )
+
+    return (
+        f"{bar}\n{title}\n"
+        f"🕐 {_now()} · ⏰ H1\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"💰 Giá hiện tại   : {entry:,.4f} USDT\n"
+        f"📍 Điểm vào       : {entry:,.4f}\n"
+        f"🛡 Cắt lỗ (SL)   : {sig['sl']:,.4f}  (−{sig['sl_pct']}%)\n"
+        f"🎯 Chốt lời (TP)  : {sig['tp']:,.4f}  (+{sig['tp_pct']}%)\n"
+        f"⚖️ R:R             : 1:{RR_RATIO}\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"{tl}\n"
+        f"📌 Supertrend     : {sig['st_val']}\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"🎯 Confirmation   : {sig['score']}\n"
+        f"{confirms_str}\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"⚡ Chiến lược C — Supertrend + Confirmation\n"
+        f"⚠️ Không phải lời khuyên đầu tư!\n"
+        f"{bar}"
+    )

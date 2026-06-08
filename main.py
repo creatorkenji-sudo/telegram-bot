@@ -6,13 +6,15 @@ import requests
 from datetime import datetime
 
 from data import get_klines
+from strategy_c import check_strategy_c
 from trend import multi_trend, detect_kumo_cross
 from entry import check_entry
 from ema_strategy import check_ema_signal
 from telegram_bot import run_telegram
 from formatter import (
     format_kumo_cross, format_ichimoku_entry,
-    format_ema_signal, format_startup, format_heartbeat
+    format_ema_signal, format_startup, format_heartbeat,
+    format_strategy_c
 )
 from state import state
 from config import CHECK_INTERVAL, TIMEFRAMES, TOKEN, CHAT_ID
@@ -76,6 +78,23 @@ def run_strategy_b(symbol: str):
         print(f"  —  [B] {symbol}: ${price:,.4f} | chưa đủ 2/3")
 
 
+
+# ── Chiến lược C: Supertrend + Confirmation ──────────────────
+def run_strategy_c(symbol: str):
+    if not state["strategies"].get("supertrend"):
+        return
+    df_h1 = get_klines(symbol, TIMEFRAMES["h1"])
+    price = df_h1["close"].iloc[-1]
+    sig   = check_strategy_c(symbol, df_h1, state["confirms_c"])
+
+    if sig and sig["type"] != state["last_c_signal"].get(symbol):
+        send(format_strategy_c(symbol, sig))
+        state["last_c_signal"][symbol] = sig["type"]
+        print(f"  ⚡ [C] {symbol}: {sig['type']} ${sig['entry']} score={sig['score']}")
+    elif not sig:
+        state["last_c_signal"][symbol] = None
+        print(f"  —  [C] {symbol}: ${price:,.4f} | chờ tín hiệu")
+
 # ── Main loop ────────────────────────────────────────────────
 def main():
     send(format_startup(state["symbols_a"], state["symbols_b"]))
@@ -96,6 +115,13 @@ def main():
                 run_strategy_a(symbol)
             except Exception as e:
                 print(f"  ❌ [A] {symbol}: {e}")
+
+        # Chiến lược C — danh sách riêng
+        for symbol in list(state["symbols_c"]):
+            try:
+                run_strategy_c(symbol)
+            except Exception as e:
+                print(f"  ❌ [C] {symbol}: {e}")
 
         # Chiến lược B — danh sách riêng
         for symbol in list(state["symbols_b"]):

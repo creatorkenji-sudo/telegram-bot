@@ -99,3 +99,71 @@ def strategy_status() -> str:
         f"/ab COIN · /rb COIN  (thêm/xóa CL B)\n"
         f"/add COIN · /remove COIN  (cả 2)"
     )
+
+
+# ════════════════════════════════════════════════════════════
+#  CHIẾN LƯỢC C — Supertrend + Confirmation động
+# ════════════════════════════════════════════════════════════
+
+# Danh sách coin CL C
+state["symbols_c"] = list(DEFAULT_SYMBOLS)
+
+# Chiến lược C bật/tắt
+state["strategies"]["supertrend"] = True
+
+# Confirmation đang BẬT cho CL C (mặc định: choppiness + adx + volume)
+state["confirms_c"] = ["choppiness", "adx", "volume"]
+
+# Trạng thái tránh spam CL C
+state["last_c_signal"] = {}   # symbol -> "LONG" | "SHORT" | None
+
+
+from strategy_c import CONFIRMATION_MAP, CONFIRMATION_LABELS
+
+
+def add_symbol_c(symbol: str) -> bool:
+    s = symbol.upper()
+    if s not in state["symbols_c"]:
+        state["symbols_c"].append(s)
+        return True
+    return False
+
+
+def remove_symbol_c(symbol: str) -> bool:
+    s = symbol.upper()
+    if s in state["symbols_c"]:
+        state["symbols_c"].remove(s)
+        state["last_c_signal"].pop(s, None)
+        return True
+    return False
+
+
+def set_confirms_c(names: list[str]) -> tuple[list, list]:
+    """Cập nhật danh sách confirmation. Trả về (valid, invalid)."""
+    valid, invalid = [], []
+    for n in names:
+        if n in CONFIRMATION_MAP:
+            valid.append(n)
+        else:
+            invalid.append(n)
+    if valid:
+        state["confirms_c"] = valid
+    return valid, invalid
+
+
+def confirms_status() -> str:
+    all_confirms = list(CONFIRMATION_MAP.keys())
+    lines = []
+    for name in all_confirms:
+        icon  = "✅" if name in state["confirms_c"] else "⬜"
+        label = CONFIRMATION_LABELS.get(name, name)
+        lines.append(f"  {icon} {name:<12} — {label}")
+    active = len(state["confirms_c"])
+    return (
+        f"⚙️  CONFIRMATION — CHIẾN LƯỢC C\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        + "\n".join(lines) +
+        f"\n━━━━━━━━━━━━━━━━━━━━\n"
+        f"✅ Đang bật: {active} indicator\n"
+        f"Lệnh: /set_confirm qqe adx volume ssl ..."
+    )
