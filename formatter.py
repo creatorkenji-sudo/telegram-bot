@@ -105,6 +105,7 @@ def format_ema_signal(symbol, sig):
         f"📊 EMA H1: {sig['ema20_h1']} · {sig['ema50_h1']} · {sig['ema100_h1']}\n"
         f"📌 Pullback tại  : {sig['pullback_ema']}\n"
         f"📉 MACD histogram: đổi chiều {'🔼' if sig['macd_flip']=='UP' else '🔽'}\n"
+        f"📊 RSI 15m        : {sig.get('rsi_val','—')}\n"
         f"━━━━━━━━━━━━━━━━━━━━\n"
         f"🎯 Điều kiện : {sig['score']}\n"
         f"{passed_str}\n"

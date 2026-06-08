@@ -26,6 +26,18 @@ state = {
     "last_entry_signal": {},
     "last_ema_signal":   {},
     "last_c_signal":     {},
+
+    # ── Bộ lọc Chiến lược B ──────────────────────────────────
+    "filters_b": {
+        "ema_h1":   True,
+        "ema_15m":  True,
+        "macd":     True,
+        "rsi":      True,
+        "candle":   True,
+        "trend":    True,
+        "momentum": False,
+    },
+    "min_pass_b": 4,
 }
 
 

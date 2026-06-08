@@ -67,7 +67,8 @@ def run_strategy_b(symbol: str):
     df_h1  = get_klines(symbol, TIMEFRAMES["h1"])
     df_m15 = get_klines(symbol, TIMEFRAMES["m15"])
     price  = df_m15["close"].iloc[-1]
-    sig    = check_ema_signal(symbol, df_h1, df_m15)
+    sig    = check_ema_signal(symbol, df_h1, df_m15,
+                          state["filters_b"], state["min_pass_b"])
 
     if sig and sig["type"] != state["last_ema_signal"].get(symbol):
         send(format_ema_signal(symbol, sig))

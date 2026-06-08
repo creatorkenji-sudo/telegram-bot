@@ -2,6 +2,8 @@
 #  telegram_bot.py — Commands Telegram (PTB 13.x)
 # ============================================================
 from telegram.ext import Updater, CommandHandler
+from panel_b import format_panel_b, format_filter_update, format_minpass_update
+from ema_strategy import FILTER_KEYS, FILTER_LABELS
 from state import (
     state,
     add_symbol, remove_symbol,
@@ -161,6 +163,69 @@ def _clean(symbol: str) -> str:
 
 
 # ── Khởi động polling ─────────────────────────────────────────
+
+def cmd_panel_b(update, context):
+    """Hiện bảng điều khiển CL B."""
+    update.message.reply_text(
+        format_panel_b(state["strategies"], state["filters_b"], state["min_pass_b"])
+    )
+
+
+def cmd_filter_b(update, context):
+    """
+    /filter_b on ema_h1
+    /filter_b off macd
+    """
+    if len(context.args) < 2:
+        update.message.reply_text(
+            "❌ Dùng: /filter_b on ema_h1\n"
+            "hoặc : /filter_b off macd\n\n"
+            "Các bộ lọc: " + ", ".join(FILTER_KEYS)
+        )
+        return
+    action = context.args[0].lower()
+    key    = context.args[1].lower()
+    if key not in FILTER_KEYS:
+        update.message.reply_text(
+            f"⚠️ Không tìm thấy bộ lọc '{key}'\n"
+            f"Danh sách: {', '.join(FILTER_KEYS)}"
+        )
+        return
+    if action not in ("on", "off"):
+        update.message.reply_text("❌ Dùng: on hoặc off")
+        return
+    is_on = action == "on"
+    state["filters_b"][key] = is_on
+    # Đảm bảo min_pass không vượt số bộ lọc đang bật
+    n_on = sum(1 for v in state["filters_b"].values() if v)
+    if state["min_pass_b"] > n_on:
+        state["min_pass_b"] = max(1, n_on)
+    update.message.reply_text(
+        format_filter_update(key, is_on, state["filters_b"], state["min_pass_b"])
+    )
+
+
+def cmd_minpass_b(update, context):
+    """
+    /minpass_b 4
+    Đặt ngưỡng tối thiểu cần pass cho CL B.
+    """
+    if not context.args or not context.args[0].isdigit():
+        update.message.reply_text("❌ Dùng: /minpass_b 4")
+        return
+    val  = int(context.args[0])
+    n_on = sum(1 for v in state["filters_b"].values() if v)
+    if val < 1 or val > n_on:
+        update.message.reply_text(
+            f"⚠️ Ngưỡng phải từ 1 đến {n_on} (số bộ lọc đang bật)"
+        )
+        return
+    state["min_pass_b"] = val
+    update.message.reply_text(
+        format_minpass_update(val, state["filters_b"])
+    )
+
+
 def run_telegram():
     updater = Updater(TOKEN, use_context=True)
     updater.bot.delete_webhook(drop_pending_updates=True)
@@ -309,6 +374,69 @@ def cmd_remove_confirm(update, context):
 # ── Đăng ký handler mới vào run_telegram ────────────────────
 _original_run = run_telegram
 
+
+def cmd_panel_b(update, context):
+    """Hiện bảng điều khiển CL B."""
+    update.message.reply_text(
+        format_panel_b(state["strategies"], state["filters_b"], state["min_pass_b"])
+    )
+
+
+def cmd_filter_b(update, context):
+    """
+    /filter_b on ema_h1
+    /filter_b off macd
+    """
+    if len(context.args) < 2:
+        update.message.reply_text(
+            "❌ Dùng: /filter_b on ema_h1\n"
+            "hoặc : /filter_b off macd\n\n"
+            "Các bộ lọc: " + ", ".join(FILTER_KEYS)
+        )
+        return
+    action = context.args[0].lower()
+    key    = context.args[1].lower()
+    if key not in FILTER_KEYS:
+        update.message.reply_text(
+            f"⚠️ Không tìm thấy bộ lọc '{key}'\n"
+            f"Danh sách: {', '.join(FILTER_KEYS)}"
+        )
+        return
+    if action not in ("on", "off"):
+        update.message.reply_text("❌ Dùng: on hoặc off")
+        return
+    is_on = action == "on"
+    state["filters_b"][key] = is_on
+    # Đảm bảo min_pass không vượt số bộ lọc đang bật
+    n_on = sum(1 for v in state["filters_b"].values() if v)
+    if state["min_pass_b"] > n_on:
+        state["min_pass_b"] = max(1, n_on)
+    update.message.reply_text(
+        format_filter_update(key, is_on, state["filters_b"], state["min_pass_b"])
+    )
+
+
+def cmd_minpass_b(update, context):
+    """
+    /minpass_b 4
+    Đặt ngưỡng tối thiểu cần pass cho CL B.
+    """
+    if not context.args or not context.args[0].isdigit():
+        update.message.reply_text("❌ Dùng: /minpass_b 4")
+        return
+    val  = int(context.args[0])
+    n_on = sum(1 for v in state["filters_b"].values() if v)
+    if val < 1 or val > n_on:
+        update.message.reply_text(
+            f"⚠️ Ngưỡng phải từ 1 đến {n_on} (số bộ lọc đang bật)"
+        )
+        return
+    state["min_pass_b"] = val
+    update.message.reply_text(
+        format_minpass_update(val, state["filters_b"])
+    )
+
+
 def run_telegram():
     updater = Updater(TOKEN, use_context=True)
     updater.bot.delete_webhook(drop_pending_updates=True)
@@ -333,6 +461,9 @@ def run_telegram():
     dp.add_handler(CommandHandler("add_confirm",    cmd_add_confirm))
     dp.add_handler(CommandHandler("remove_confirm", cmd_remove_confirm))
     dp.add_handler(CommandHandler("confirms",       cmd_confirms))
+    dp.add_handler(CommandHandler("panel_b",        cmd_panel_b))
+    dp.add_handler(CommandHandler("filter_b",       cmd_filter_b))
+    dp.add_handler(CommandHandler("minpass_b",      cmd_minpass_b))
 
     updater.start_polling()
     print("✅ Telegram bot polling...")
