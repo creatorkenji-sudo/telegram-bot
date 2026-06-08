@@ -9,19 +9,25 @@ _TZ_VN = timezone(timedelta(hours=7))
 def _now():
     return datetime.now(_TZ_VN).strftime("%d/%m %H:%M") + " (UTC+7)"
 
+def _fmt(symbols): 
+    return " · ".join(s.replace("USDT","") for s in symbols) or "Trống"
+
+def _fmt_list(symbols):
+    return "\n".join(f"  • {s}" for s in symbols) if symbols else "  (Trống)"
+
 
 # ════════════════════════════════════════════════════════════
-#  CHIẾN LƯỢC A
+#  CHIẾN LƯỢC A — Ichimoku + StochRSI
 # ════════════════════════════════════════════════════════════
 def format_kumo_cross(symbol, direction, price, timeframe):
     coin = symbol.replace("USDT","")
     if direction == "UP":
-        bar = "☁️🟢══════════════════🟢☁️"
+        bar   = "☁️🟢══════════════════🟢☁️"
         title = f"🚀  KUMO CROSS TĂNG — {coin}/USDT"
         desc  = "📈 Giá vừa CẮT LÊN TRÊN mây Ichimoku"
         sig   = "🐂 Tín hiệu TĂNG — chờ xác nhận entry"
     else:
-        bar = "☁️🔴══════════════════🔴☁️"
+        bar   = "☁️🔴══════════════════🔴☁️"
         title = f"💥  KUMO CROSS GIẢM — {coin}/USDT"
         desc  = "📉 Giá vừa CẮT XUỐNG DƯỚI mây Ichimoku"
         sig   = "🐻 Tín hiệu GIẢM — chờ xác nhận entry"
@@ -71,17 +77,17 @@ def format_ichimoku_entry(symbol, trend, timeframe, setup):
 
 
 # ════════════════════════════════════════════════════════════
-#  CHIẾN LƯỢC B
+#  CHIẾN LƯỢC B — EMA Pullback + MACD
 # ════════════════════════════════════════════════════════════
 def format_ema_signal(symbol, sig):
     coin  = symbol.replace("USDT","")
     entry = sig["entry"]
     if sig["type"] == "LONG":
-        bar = "📈🟢══════════════════🟢📈"
+        bar   = "📈🟢══════════════════🟢📈"
         title = f"🚀  EMA PULLBACK LONG — {coin}/USDT"
         tl    = "🐂 Xu hướng H1: TĂNG (EMA20 > EMA50)"
     else:
-        bar = "📉🔴══════════════════🔴📉"
+        bar   = "📉🔴══════════════════🔴📉"
         title = f"💥  EMA PULLBACK SHORT — {coin}/USDT"
         tl    = "🐻 Xu hướng H1: GIẢM (EMA20 < EMA50)"
     passed_str = " · ".join(f"✅ {p}" for p in sig["passed"])
@@ -110,81 +116,11 @@ def format_ema_signal(symbol, sig):
 
 
 # ════════════════════════════════════════════════════════════
-#  CHUNG
-# ════════════════════════════════════════════════════════════
-def format_startup(symbols_a: list, symbols_b: list) -> str:
-    ca = " · ".join(s.replace("USDT","") for s in symbols_a) or "Trống"
-    cb = " · ".join(s.replace("USDT","") for s in symbols_b) or "Trống"
-    return (
-        f"✅  BOT CRYPTO ALERT BẬT\n"
-        f"🕐 {_now()}\n"
-        f"━━━━━━━━━━━━━━━━━━━━\n"
-        f"☁️  CL A (Ichimoku) : {ca}\n"
-        f"📈 CL B (EMA+MACD)  : {cb}\n"
-        f"⚖️ R:R : 1:{RR_RATIO}  ·  SL {SL_PERCENT}%\n"
-        f"━━━━━━━━━━━━━━━━━━━━\n"
-        f"/aa /ra  — thêm/xóa coin CL A\n"
-        f"/ab /rb  — thêm/xóa coin CL B\n"
-        f"/add /remove  — cả 2\n"
-        f"/strategy_a  /strategy_b  /status"
-    )
-
-
-def format_status(symbols_a: list, symbols_b: list, strategies: dict = None) -> str:
-    ca = "\n".join(f"  • {s}" for s in symbols_a) if symbols_a else "  (Trống)"
-    cb = "\n".join(f"  • {s}" for s in symbols_b) if symbols_b else "  (Trống)"
-    if strategies:
-        a = "✅ BẬT" if strategies.get("ichimoku") else "❌ TẮT"
-        b = "✅ BẬT" if strategies.get("ema")      else "❌ TẮT"
-        strat = (
-            f"━━━━━━━━━━━━━━━━━━━━\n"
-            f"⚙️  Chiến lược:\n"
-            f"  ☁️  A — Ichimoku : {a}\n"
-            f"  📈 B — EMA+MACD  : {b}\n"
-        )
-    else:
-        strat = ""
-    return (
-        f"📋  TRẠNG THÁI BOT\n"
-        f"🕐 {_now()}\n"
-        f"━━━━━━━━━━━━━━━━━━━━\n"
-        f"☁️  CL A (Ichimoku):\n{ca}\n"
-        f"━━━━━━━━━━━━━━━━━━━━\n"
-        f"📈 CL B (EMA+MACD):\n{cb}\n"
-        f"{strat}"
-        f"━━━━━━━━━━━━━━━━━━━━\n"
-        f"⚖️ R:R = 1:{RR_RATIO}  ·  SL {SL_PERCENT}%"
-    )
-
-
-def format_heartbeat(symbols_a: list, symbols_b: list, strategies: dict) -> str:
-    ca = " · ".join(s.replace("USDT","") for s in symbols_a) or "Trống"
-    cb = " · ".join(s.replace("USDT","") for s in symbols_b) or "Trống"
-    a  = "✅" if strategies.get("ichimoku") else "❌"
-    b  = "✅" if strategies.get("ema")      else "❌"
-    return (
-        f"💚  BOT ĐANG HOẠT ĐỘNG\n"
-        f"🕐 {_now()}\n"
-        f"━━━━━━━━━━━━━━━━━━━━\n"
-        f"☁️  CL A {a}: {ca}\n"
-        f"📈 CL B {b}: {cb}\n"
-        f"━━━━━━━━━━━━━━━━━━━━\n"
-        f"✅ Hoạt động bình thường"
-    )
-
-
-# Alias
-format_entry = format_ichimoku_entry
-format_setup = format_ichimoku_entry
-
-
-# ════════════════════════════════════════════════════════════
 #  CHIẾN LƯỢC C — Supertrend + Confirmation
 # ════════════════════════════════════════════════════════════
 def format_strategy_c(symbol: str, sig: dict) -> str:
-    coin  = symbol.replace("USDT", "")
+    coin  = symbol.replace("USDT","")
     entry = sig["entry"]
-
     if sig["type"] == "LONG":
         bar   = "⚡🟢══════════════════🟢⚡"
         title = f"🚀  SUPERTREND LONG — {coin}/USDT"
@@ -193,12 +129,10 @@ def format_strategy_c(symbol: str, sig: dict) -> str:
         bar   = "⚡🔴══════════════════🔴⚡"
         title = f"💥  SUPERTREND SHORT — {coin}/USDT"
         tl    = "🐻 Xu hướng: GIẢM  (Supertrend H1)"
-
     confirms_str = (
         " · ".join(f"✅ {p}" for p in sig["passed"])
         if sig["passed"] else "⚡ Supertrend only"
     )
-
     return (
         f"{bar}\n{title}\n"
         f"🕐 {_now()} · ⏰ H1\n"
@@ -219,3 +153,92 @@ def format_strategy_c(symbol: str, sig: dict) -> str:
         f"⚠️ Không phải lời khuyên đầu tư!\n"
         f"{bar}"
     )
+
+
+# ════════════════════════════════════════════════════════════
+#  CHUNG — startup / status / heartbeat
+# ════════════════════════════════════════════════════════════
+def format_startup(symbols_a, symbols_b, symbols_c=None) -> str:
+    ca = _fmt(symbols_a)
+    cb = _fmt(symbols_b)
+    cc = _fmt(symbols_c) if symbols_c is not None else "Trống"
+    return (
+        f"✅  BOT CRYPTO ALERT BẬT\n"
+        f"🕐 {_now()}\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"☁️  CL A (Ichimoku)   : {ca}\n"
+        f"📈 CL B (EMA+MACD)    : {cb}\n"
+        f"⚡ CL C (Supertrend)  : {cc}\n"
+        f"⚖️ R:R : 1:{RR_RATIO}  ·  SL {SL_PERCENT}%\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"/aa /ra — CL A  ·  /ab /rb — CL B  ·  /ac /rc — CL C\n"
+        f"/add /remove — cả 3\n"
+        f"/strategy_a  /strategy_b  /strategy_c\n"
+        f"/confirms  /set_confirm  /status"
+    )
+
+
+def format_status(symbols_a, symbols_b, strategies=None,
+                  symbols_c=None, confirms_c=None) -> str:
+    ca = _fmt_list(symbols_a)
+    cb = _fmt_list(symbols_b)
+    cc = _fmt_list(symbols_c) if symbols_c else "  (Trống)"
+
+    if strategies:
+        sa = "✅ BẬT" if strategies.get("ichimoku")   else "❌ TẮT"
+        sb = "✅ BẬT" if strategies.get("ema")         else "❌ TẮT"
+        sc = "✅ BẬT" if strategies.get("supertrend")  else "❌ TẮT"
+        strat = (
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"⚙️  Chiến lược:\n"
+            f"  ☁️  A — Ichimoku    : {sa}\n"
+            f"  📈 B — EMA+MACD    : {sb}\n"
+            f"  ⚡ C — Supertrend  : {sc}\n"
+        )
+    else:
+        strat = ""
+
+    conf_line = ""
+    if confirms_c is not None:
+        active = ", ".join(confirms_c) if confirms_c else "Không có"
+        conf_line = f"━━━━━━━━━━━━━━━━━━━━\n🔧 CL C confirmation: {active}\n"
+
+    return (
+        f"📋  TRẠNG THÁI BOT\n"
+        f"🕐 {_now()}\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"☁️  CL A (Ichimoku):\n{ca}\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"📈 CL B (EMA+MACD):\n{cb}\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"⚡ CL C (Supertrend):\n{cc}\n"
+        f"{strat}"
+        f"{conf_line}"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"⚖️ R:R = 1:{RR_RATIO}  ·  SL {SL_PERCENT}%"
+    )
+
+
+def format_heartbeat(symbols_a, symbols_b, strategies,
+                     symbols_c=None) -> str:
+    ca = _fmt(symbols_a)
+    cb = _fmt(symbols_b)
+    cc = _fmt(symbols_c) if symbols_c else "Trống"
+    sa = "✅" if strategies.get("ichimoku")  else "❌"
+    sb = "✅" if strategies.get("ema")        else "❌"
+    sc = "✅" if strategies.get("supertrend") else "❌"
+    return (
+        f"💚  BOT ĐANG HOẠT ĐỘNG\n"
+        f"🕐 {_now()}\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"☁️  CL A {sa}: {ca}\n"
+        f"📈 CL B {sb}: {cb}\n"
+        f"⚡ CL C {sc}: {cc}\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"✅ Hoạt động bình thường"
+    )
+
+
+# Alias
+format_entry = format_ichimoku_entry
+format_setup = format_ichimoku_entry
