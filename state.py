@@ -7,19 +7,25 @@ state = {
     "chat_id": CHAT_ID,
 
     # ── Danh sách coin riêng cho từng chiến lược ─────────────
-    "symbols_a": list(DEFAULT_SYMBOLS),   # Chiến lược A: Ichimoku
-    "symbols_b": list(DEFAULT_SYMBOLS),   # Chiến lược B: EMA+MACD
+    "symbols_a": list(DEFAULT_SYMBOLS),   # Chiến lược A
+    "symbols_b": list(DEFAULT_SYMBOLS),   # Chiến lược B
+    "symbols_c": list(DEFAULT_SYMBOLS),   # Chiến lược C
 
-    # ── Bật/tắt từng chiến lược ──────────────────────────────
+    # ── Bật/tắt chiến lược — khai báo đầy đủ ngay từ đầu ────
     "strategies": {
-        "ichimoku": True,
-        "ema":      True,
+        "ichimoku":   True,
+        "ema":        True,
+        "supertrend": True,
     },
+
+    # ── Confirmation CL C ─────────────────────────────────────
+    "confirms_c": ["choppiness", "adx", "volume"],
 
     # ── Trạng thái tránh spam ─────────────────────────────────
     "last_kumo_cross":   {},
     "last_entry_signal": {},
     "last_ema_signal":   {},
+    "last_c_signal":     {},
 }
 
 
@@ -58,18 +64,31 @@ def remove_symbol_b(symbol: str) -> bool:
     return False
 
 
-# ── Thêm/xóa cả 2 (lệnh chung) ───────────────────────────────
+# ── Chiến lược C ─────────────────────────────────────────────
+def add_symbol_c(symbol: str) -> bool:
+    s = symbol.upper()
+    if s not in state["symbols_c"]:
+        state["symbols_c"].append(s)
+        return True
+    return False
+
+def remove_symbol_c(symbol: str) -> bool:
+    s = symbol.upper()
+    if s in state["symbols_c"]:
+        state["symbols_c"].remove(s)
+        state["last_c_signal"].pop(s, None)
+        return True
+    return False
+
+
+# ── Thêm/xóa cả 3 ────────────────────────────────────────────
 def add_symbol(symbol: str) -> bool:
     s = symbol.upper()
-    a = add_symbol_a(s)
-    b = add_symbol_b(s)
-    return a or b
+    return add_symbol_a(s) | add_symbol_b(s) | add_symbol_c(s)
 
 def remove_symbol(symbol: str) -> bool:
     s = symbol.upper()
-    a = remove_symbol_a(s)
-    b = remove_symbol_b(s)
-    return a or b
+    return remove_symbol_a(s) | remove_symbol_b(s) | remove_symbol_c(s)
 
 
 # ── Bật/tắt chiến lược ───────────────────────────────────────
@@ -81,89 +100,54 @@ def toggle_strategy(name: str):
 
 
 def strategy_status() -> str:
-    a = "✅ BẬT" if state["strategies"]["ichimoku"] else "❌ TẮT"
-    b = "✅ BẬT" if state["strategies"]["ema"]      else "❌ TẮT"
-    coins_a = ", ".join(s.replace("USDT","") for s in state["symbols_a"]) or "Trống"
-    coins_b = ", ".join(s.replace("USDT","") for s in state["symbols_b"]) or "Trống"
+    sa = "✅ BẬT" if state["strategies"].get("ichimoku")   else "❌ TẮT"
+    sb = "✅ BẬT" if state["strategies"].get("ema")         else "❌ TẮT"
+    sc = "✅ BẬT" if state["strategies"].get("supertrend")  else "❌ TẮT"
+    ca = ", ".join(s.replace("USDT","") for s in state["symbols_a"]) or "Trống"
+    cb = ", ".join(s.replace("USDT","") for s in state["symbols_b"]) or "Trống"
+    cc = ", ".join(s.replace("USDT","") for s in state["symbols_c"]) or "Trống"
+    cf = ", ".join(state["confirms_c"]) or "Không có"
     return (
         f"⚙️  TRẠNG THÁI CHIẾN LƯỢC\n"
         f"━━━━━━━━━━━━━━━━━━━━\n"
-        f"☁️  Chiến lược A — Ichimoku : {a}\n"
-        f"   Coin: {coins_a}\n"
+        f"☁️  CL A — Ichimoku    : {sa}\n"
+        f"   Coin: {ca}\n"
         f"━━━━━━━━━━━━━━━━━━━━\n"
-        f"📈 Chiến lược B — EMA+MACD  : {b}\n"
-        f"   Coin: {coins_b}\n"
+        f"📈 CL B — EMA+MACD     : {sb}\n"
+        f"   Coin: {cb}\n"
         f"━━━━━━━━━━━━━━━━━━━━\n"
-        f"Lệnh:\n"
-        f"/aa COIN · /ra COIN  (thêm/xóa CL A)\n"
-        f"/ab COIN · /rb COIN  (thêm/xóa CL B)\n"
-        f"/add COIN · /remove COIN  (cả 2)"
+        f"⚡ CL C — Supertrend   : {sc}\n"
+        f"   Coin: {cc}\n"
+        f"   Confirmation: {cf}\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"/aa /ra — CL A  ·  /ab /rb — CL B  ·  /ac /rc — CL C\n"
+        f"/add /remove — cả 3  ·  /confirms — xem CL C"
     )
 
 
-# ════════════════════════════════════════════════════════════
-#  CHIẾN LƯỢC C — Supertrend + Confirmation động
-# ════════════════════════════════════════════════════════════
-
-# Danh sách coin CL C
-state["symbols_c"] = list(DEFAULT_SYMBOLS)
-
-# Chiến lược C bật/tắt
-state["strategies"]["supertrend"] = True
-
-# Confirmation đang BẬT cho CL C (mặc định: choppiness + adx + volume)
-state["confirms_c"] = ["choppiness", "adx", "volume"]
-
-# Trạng thái tránh spam CL C
-state["last_c_signal"] = {}   # symbol -> "LONG" | "SHORT" | None
-
-
+# ── Confirmation CL C ─────────────────────────────────────────
 from strategy_c import CONFIRMATION_MAP, CONFIRMATION_LABELS
 
 
-def add_symbol_c(symbol: str) -> bool:
-    s = symbol.upper()
-    if s not in state["symbols_c"]:
-        state["symbols_c"].append(s)
-        return True
-    return False
-
-
-def remove_symbol_c(symbol: str) -> bool:
-    s = symbol.upper()
-    if s in state["symbols_c"]:
-        state["symbols_c"].remove(s)
-        state["last_c_signal"].pop(s, None)
-        return True
-    return False
-
-
-def set_confirms_c(names: list[str]) -> tuple[list, list]:
-    """Cập nhật danh sách confirmation. Trả về (valid, invalid)."""
+def set_confirms_c(names: list) -> tuple:
     valid, invalid = [], []
     for n in names:
-        if n in CONFIRMATION_MAP:
-            valid.append(n)
-        else:
-            invalid.append(n)
+        (valid if n in CONFIRMATION_MAP else invalid).append(n)
     if valid:
         state["confirms_c"] = valid
     return valid, invalid
 
 
 def confirms_status() -> str:
-    all_confirms = list(CONFIRMATION_MAP.keys())
     lines = []
-    for name in all_confirms:
-        icon  = "✅" if name in state["confirms_c"] else "⬜"
-        label = CONFIRMATION_LABELS.get(name, name)
-        lines.append(f"  {icon} {name:<12} — {label}")
-    active = len(state["confirms_c"])
+    for name, label in CONFIRMATION_LABELS.items():
+        icon = "✅" if name in state["confirms_c"] else "⬜"
+        lines.append(f"  {icon} {name:<14} — {label}")
     return (
-        f"⚙️  CONFIRMATION — CHIẾN LƯỢC C\n"
+        f"🔧  CONFIRMATION — CL C\n"
         f"━━━━━━━━━━━━━━━━━━━━\n"
         + "\n".join(lines) +
         f"\n━━━━━━━━━━━━━━━━━━━━\n"
-        f"✅ Đang bật: {active} indicator\n"
+        f"✅ Đang bật: {len(state['confirms_c'])} indicator\n"
         f"Lệnh: /set_confirm qqe adx volume ssl ..."
     )
