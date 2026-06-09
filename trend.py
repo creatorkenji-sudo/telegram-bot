@@ -26,15 +26,14 @@ def get_trend(df):
 
 def multi_trend(df_h4, df_h1):
     """
-    Cả H4 và H1 phải đồng thuận.
+    Chỉ dùng H1 xác nhận trend — bỏ H4.
     Trả về: 'UPTREND' | 'DOWNTREND' | 'NO_TREND'
     """
-    t4 = get_trend(df_h4)
     t1 = get_trend(df_h1)
 
-    if t4 == "UP"   and t1 == "UP":
+    if t1 == "UP":
         return "UPTREND"
-    if t4 == "DOWN" and t1 == "DOWN":
+    if t1 == "DOWN":
         return "DOWNTREND"
     return "NO_TREND"
 
