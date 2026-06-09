@@ -87,7 +87,7 @@ def check_sltp(symbol: str, current_price: float) -> dict | None:
     tp        = t["tp"]
     elapsed   = time.time() - t["ts_entry"]
 
-    # Timeout 8 giờ
+    # Timeout 2 giờ
     if elapsed >= TIMEOUT_SECONDS:
         result = {
             "type":       "TIMEOUT",
@@ -230,7 +230,7 @@ def check_ema_signal(symbol: str, df_h1: pd.DataFrame, df_m15: pd.DataFrame,
     # Đang có lệnh → không tìm lệnh mới
     if t["status"] == "IN_TRADE":
         elapsed = round((time.time() - t["ts_entry"]) / 3600, 1)
-        print(f"    🔒 [B] {symbol}: IN_TRADE {t['direction']} entry={t['entry']} ({elapsed}h / 8h)")
+        print(f"    🔒 [B] {symbol}: IN_TRADE {t['direction']} entry={t['entry']} ({elapsed}h / 2h)")
         return None
 
     # Cooldown
