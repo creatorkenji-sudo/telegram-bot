@@ -6,7 +6,7 @@
 #  2. Mỗi vòng lặp kiểm tra giá hiện tại vs SL/TP
 #  3. Nếu chạm SL → báo "Cắt lỗ" → reset → tìm lệnh mới
 #  4. Nếu chạm TP → báo "Chốt lời" → reset → tìm lệnh mới
-#  5. Timeout 8 giờ → reset
+#  5. Timeout 2 giờ → reset
 # ============================================================
 import time
 import pandas as pd
@@ -17,7 +17,7 @@ from config import SL_PERCENT, RR_RATIO
 COOLDOWN_SECONDS  = 30 * 60    # 30 phút cooldown sau reset
 MACD_MIN_FLIP     = 0.0001
 TREND_CONSISTENCY = 3
-TIMEOUT_SECONDS   = 8 * 3600  # 8 giờ timeout
+TIMEOUT_SECONDS   = 2 * 3600  # 2 giờ timeout
 
 # ── Trade state per symbol ────────────────────────────────────
 # symbol -> {
