@@ -36,16 +36,33 @@ def run_strategy_a(symbol: str):
     df_h4  = get_klines(symbol, TIMEFRAMES["h4"])
     df_h1  = get_klines(symbol, TIMEFRAMES["h1"])
     df_m15 = get_klines(symbol, TIMEFRAMES["m15"])
-    price  = df_m15["close"].iloc[-1]
-    trend  = multi_trend(df_h4, df_h1)
 
-    kumo = detect_kumo_cross(df_h1)
-    if kumo and kumo != state["last_kumo_cross"].get(symbol):
-        send(format_kumo_cross(symbol, kumo, price, "H1"))
-        state["last_kumo_cross"][symbol] = kumo
-        print(f"  ☁️  [A] {symbol}: Kumo Cross {kumo}")
-    elif not kumo:
-        state["last_kumo_cross"][symbol] = None
+    # Giá đóng cửa nến [-2] — không dùng giá đang chạy
+    price = df_h1["close"].iloc[-2]
+    trend = multi_trend(df_h4, df_h1)
+
+    # Kumo Cross H1 — nhạy hơn (so nến [-2] vs [-3])
+    kumo_h1 = detect_kumo_cross(df_h1, "H1")
+    # Kumo Cross H4 — thêm H4
+    kumo_h4 = detect_kumo_cross(df_h4, "H4")
+
+    for kumo, tf_label in [(kumo_h1, "H1"), (kumo_h4, "H4")]:
+        state_key = f"last_kumo_{tf_label}_{symbol}"
+        if kumo and kumo["direction"] != state["last_kumo_cross"].get(state_key):
+            # Thêm vị trí giá H1 + H4 vào cảnh báo
+            from trend import _price_vs_cloud
+            cross_info = {
+                "cloud_top":   kumo["cloud_top"],
+                "cloud_bot":   kumo["cloud_bot"],
+                "price_pos_h1": _price_vs_cloud(df_h1, "H1"),
+                "price_pos_h4": _price_vs_cloud(df_h4, "H4"),
+            }
+            send(format_kumo_cross(symbol, kumo["direction"], kumo["price"], tf_label, cross_info))
+            state["last_kumo_cross"][state_key] = kumo["direction"]
+            print(f"  ☁️  [A] {symbol}: Kumo Cross {kumo['direction']} {tf_label}")
+        elif not kumo:
+            state_key2 = f"last_kumo_{tf_label}_{symbol}"
+            state["last_kumo_cross"][state_key2] = None
 
     if trend == "NO_TREND":
         print(f"  ⏭  [A] {symbol}: H4+H1 không đồng thuận")

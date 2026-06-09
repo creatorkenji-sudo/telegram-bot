@@ -19,29 +19,40 @@ def _fmt_list(symbols):
 # ════════════════════════════════════════════════════════════
 #  CHIẾN LƯỢC A — Ichimoku + StochRSI
 # ════════════════════════════════════════════════════════════
-def format_kumo_cross(symbol, direction, price, timeframe):
+def format_kumo_cross(symbol, direction, price, timeframe, cross_info=None):
     coin = symbol.replace("USDT","")
     if direction == "UP":
         bar   = "☁️🟢══════════════════🟢☁️"
         title = f"🚀  KUMO CROSS TĂNG — {coin}/USDT"
-        desc  = "📈 Giá vừa CẮT LÊN TRÊN mây Ichimoku"
+        desc  = "📈 Giá vừa ĐÓNG CẮT LÊN TRÊN mây"
         sig   = "🐂 Tín hiệu TĂNG — chờ xác nhận entry"
     else:
         bar   = "☁️🔴══════════════════🔴☁️"
         title = f"💥  KUMO CROSS GIẢM — {coin}/USDT"
-        desc  = "📉 Giá vừa CẮT XUỐNG DƯỚI mây Ichimoku"
+        desc  = "📉 Giá vừa ĐÓNG CẮT XUỐNG DƯỚI mây"
         sig   = "🐻 Tín hiệu GIẢM — chờ xác nhận entry"
+    detail = ""
+    if cross_info:
+        ktop   = cross_info.get("cloud_top", 0)
+        kbot   = cross_info.get("cloud_bot", 0)
+        pos_h1 = cross_info.get("price_pos_h1", "")
+        pos_h4 = cross_info.get("price_pos_h4", "")
+        detail = f"━━━━━━━━━━━━━━━━━━━━\n📊 Vùng mây: {kbot:,.4f} – {ktop:,.4f}\n"
+        if pos_h1:
+            detail += f"{pos_h1}\n"
+        if pos_h4:
+            detail += f"{pos_h4}\n"
     return (
         f"{bar}\n{title}\n"
         f"🕐 {_now()} · ⏰ {timeframe}\n"
         f"━━━━━━━━━━━━━━━━━━━━\n"
-        f"💰 Giá hiện tại : {price:,.4f} USDT\n"
+        f"💰 Giá đóng cửa : {price:,.4f} USDT\n"
         f"{desc}\n{sig}\n"
+        f"{detail}"
         f"━━━━━━━━━━━━━━━━━━━━\n"
         f"📌 Chỉ báo 1 lần · ☁️ Chiến lược A\n"
         f"{bar}"
     )
-
 
 def format_ichimoku_entry(symbol, trend, timeframe, setup):
     coin  = symbol.replace("USDT","")

@@ -1,11 +1,12 @@
 # ============================================================
 #  ema_strategy.py — Chiến lược B nâng cấp
 #
-#  7 bộ lọc — bật/tắt động, ngưỡng min_pass tùy chỉnh
-#  RSI > 50 LONG / < 50 SHORT
-#  Cooldown 30 phút theo thời gian thực
-#  Chống LONG+SHORT cùng lúc
-#  Dùng nến đã đóng [-2] để xác nhận
+#  Cơ chế theo dõi SL/TP:
+#  1. Báo entry 1 lần → lưu trạng thái IN_TRADE
+#  2. Mỗi vòng lặp kiểm tra giá hiện tại vs SL/TP
+#  3. Nếu chạm SL → báo "Cắt lỗ" → reset → tìm lệnh mới
+#  4. Nếu chạm TP → báo "Chốt lời" → reset → tìm lệnh mới
+#  5. Timeout 8 giờ → reset
 # ============================================================
 import time
 import pandas as pd
@@ -13,29 +14,120 @@ import numpy as np
 from indicators import calc_emas, calc_macd
 from config import SL_PERCENT, RR_RATIO
 
-COOLDOWN_SECONDS  = 30 * 60
+COOLDOWN_SECONDS  = 30 * 60    # 30 phút cooldown sau reset
 MACD_MIN_FLIP     = 0.0001
 TREND_CONSISTENCY = 3
+TIMEOUT_SECONDS   = 8 * 3600  # 8 giờ timeout
 
-_last_signal: dict = {}
+# ── Trade state per symbol ────────────────────────────────────
+# symbol -> {
+#   status: "IDLE" | "IN_TRADE"
+#   direction, entry, sl, tp
+#   ts_entry, ts_cooldown
+# }
+_trades: dict = {}
 
 
-def _in_cooldown(symbol):
-    if symbol not in _last_signal:
+def get_trade_state(symbol: str) -> dict:
+    if symbol not in _trades:
+        _trades[symbol] = {
+            "status":      "IDLE",
+            "direction":   None,
+            "entry":       None,
+            "sl":          None,
+            "tp":          None,
+            "ts_entry":    None,
+            "ts_cooldown": None,
+        }
+    return _trades[symbol]
+
+
+def _in_cooldown(symbol: str) -> tuple[bool, int]:
+    t = get_trade_state(symbol)
+    if t["ts_cooldown"] is None:
         return False, 0
-    remaining = COOLDOWN_SECONDS - (time.time() - _last_signal[symbol]["ts"])
+    remaining = COOLDOWN_SECONDS - (time.time() - t["ts_cooldown"])
     return (True, int(remaining // 60)) if remaining > 0 else (False, 0)
 
 
-def _set_cooldown(symbol, direction):
-    _last_signal[symbol] = {"direction": direction, "ts": time.time()}
+def _set_trade(symbol: str, direction: str, entry: float, sl: float, tp: float):
+    t = get_trade_state(symbol)
+    t["status"]    = "IN_TRADE"
+    t["direction"] = direction
+    t["entry"]     = entry
+    t["sl"]        = sl
+    t["tp"]        = tp
+    t["ts_entry"]  = time.time()
 
 
-def _last_direction(symbol):
-    return _last_signal.get(symbol, {}).get("direction")
+def _reset_trade(symbol: str):
+    t = get_trade_state(symbol)
+    t["status"]      = "IDLE"
+    t["direction"]   = None
+    t["entry"]       = None
+    t["sl"]          = None
+    t["tp"]          = None
+    t["ts_entry"]    = None
+    t["ts_cooldown"] = time.time()  # bắt đầu cooldown
 
 
-# ── RSI ──────────────────────────────────────────────────────
+# ── Check SL/TP/Timeout ───────────────────────────────────────
+def check_sltp(symbol: str, current_price: float) -> dict | None:
+    """
+    Kiểm tra lệnh đang mở.
+    Trả về dict kết quả hoặc None nếu chưa chạm.
+    """
+    t = get_trade_state(symbol)
+    if t["status"] != "IN_TRADE":
+        return None
+
+    direction = t["direction"]
+    entry     = t["entry"]
+    sl        = t["sl"]
+    tp        = t["tp"]
+    elapsed   = time.time() - t["ts_entry"]
+
+    # Timeout 8 giờ
+    if elapsed >= TIMEOUT_SECONDS:
+        result = {
+            "type":       "TIMEOUT",
+            "direction":  direction,
+            "entry":      entry,
+            "sl":         sl,
+            "tp":         tp,
+            "exit_price": current_price,
+            "pnl_pct":    round((current_price - entry) / entry * 100 * (1 if direction == "LONG" else -1), 2),
+            "hours":      round(elapsed / 3600, 1),
+        }
+        _reset_trade(symbol)
+        return result
+
+    # Chạm TP
+    if direction == "LONG"  and current_price >= tp:
+        result = {"type": "TP", "direction": direction, "entry": entry, "sl": sl, "tp": tp, "exit_price": current_price, "pnl_pct": round((tp - entry) / entry * 100, 2)}
+        _reset_trade(symbol)
+        return result
+    if direction == "SHORT" and current_price <= tp:
+        result = {"type": "TP", "direction": direction, "entry": entry, "sl": sl, "tp": tp, "exit_price": current_price, "pnl_pct": round((entry - tp) / entry * 100, 2)}
+        _reset_trade(symbol)
+        return result
+
+    # Chạm SL
+    if direction == "LONG"  and current_price <= sl:
+        result = {"type": "SL", "direction": direction, "entry": entry, "sl": sl, "tp": tp, "exit_price": current_price, "pnl_pct": round((sl - entry) / entry * 100, 2)}
+        _reset_trade(symbol)
+        return result
+    if direction == "SHORT" and current_price >= sl:
+        result = {"type": "SL", "direction": direction, "entry": entry, "sl": sl, "tp": tp, "exit_price": current_price, "pnl_pct": round((entry - sl) / entry * 100, 2)}
+        _reset_trade(symbol)
+        return result
+
+    return None
+
+
+# ════════════════════════════════════════════════════════════
+#  INDICATORS
+# ════════════════════════════════════════════════════════════
 def _calc_rsi(series, period=14):
     delta = series.diff()
     gain  = delta.clip(lower=0).ewm(com=period-1, adjust=False).mean()
@@ -44,7 +136,6 @@ def _calc_rsi(series, period=14):
     return 100 - (100 / (1 + rs))
 
 
-# ── Filter helpers ────────────────────────────────────────────
 def _histogram_flip(hist):
     h2, h1 = hist.iloc[-3], hist.iloc[-2]
     if abs(h1) < MACD_MIN_FLIP:
@@ -58,8 +149,7 @@ def _histogram_flip(hist):
 
 def _trend_consistent(df, ema_val, direction):
     closes = df["close"].iloc[-(TREND_CONSISTENCY+1):-1]
-    return all(c > ema_val for c in closes) if direction == "LONG" \
-           else all(c < ema_val for c in closes)
+    return all(c > ema_val for c in closes) if direction == "LONG" else all(c < ema_val for c in closes)
 
 
 def _is_pin_bar(candle, direction):
@@ -96,8 +186,7 @@ def _momentum_ok(df, direction):
     prev = df.iloc[-2]
     cb   = abs(curr["close"] - curr["open"])
     pb   = abs(prev["close"] - prev["open"])
-    ok   = (curr["close"] > curr["open"] and cb >= pb * 0.7) if direction == "LONG" \
-           else (curr["close"] < curr["open"] and cb >= pb * 0.7)
+    ok   = (curr["close"] > curr["open"] and cb >= pb * 0.7) if direction == "LONG" else (curr["close"] < curr["open"] and cb >= pb * 0.7)
     avg_vol = df["volume"].iloc[-22:-2].mean()
     vol_ok  = df["volume"].iloc[-2] > avg_vol * 1.1
     return ok and vol_ok
@@ -127,8 +216,23 @@ FILTER_DESC = {
 }
 
 
-# ── Main check ────────────────────────────────────────────────
-def check_ema_signal(symbol, df_h1, df_m15, active_filters, min_pass):
+# ════════════════════════════════════════════════════════════
+#  MAIN CHECK
+# ════════════════════════════════════════════════════════════
+def check_ema_signal(symbol: str, df_h1: pd.DataFrame, df_m15: pd.DataFrame,
+                     active_filters: dict, min_pass: int) -> dict | None:
+    """
+    Trả về None nếu đang IN_TRADE hoặc cooldown.
+    Trả về dict tín hiệu mới nếu đủ điều kiện.
+    """
+    t = get_trade_state(symbol)
+
+    # Đang có lệnh → không tìm lệnh mới
+    if t["status"] == "IN_TRADE":
+        elapsed = round((time.time() - t["ts_entry"]) / 3600, 1)
+        print(f"    🔒 [B] {symbol}: IN_TRADE {t['direction']} entry={t['entry']} ({elapsed}h / 8h)")
+        return None
+
     # Cooldown
     in_cd, mins_left = _in_cooldown(symbol)
     if in_cd:
@@ -156,12 +260,6 @@ def check_ema_signal(symbol, df_h1, df_m15, active_filters, min_pass):
     elif ema20_h1 < ema50_h1:
         direction = "SHORT"
     else:
-        return None
-
-    # Chống ngược chiều
-    last_dir = _last_direction(symbol)
-    if last_dir and last_dir != direction and _in_cooldown(symbol)[0]:
-        print(f"    🚫 [B] {symbol}: vừa báo {last_dir}, bỏ qua {direction}")
         return None
 
     # Pullback EMA
@@ -192,38 +290,33 @@ def check_ema_signal(symbol, df_h1, df_m15, active_filters, min_pass):
         "momentum": _momentum_ok(df_m15, direction),
     }
 
-    # Chỉ tính bộ lọc đang BẬT
     enabled  = {k: v for k, v in raw.items() if active_filters.get(k, True)}
     passed   = [FILTER_LABELS[k] for k, v in enabled.items() if v]
     failed   = [FILTER_LABELS[k] for k, v in enabled.items() if not v]
     n_passed = len(passed)
     n_total  = len(enabled)
 
-    print(f"    📊 [B] {symbol} {direction}: {n_passed}/{n_total} "
-          f"(cần {min_pass}) — RSI={rsi_val}")
+    print(f"    📊 [B] {symbol} {direction}: {n_passed}/{n_total} (cần {min_pass}) RSI={rsi_val}")
 
     if n_passed < min_pass:
         return None
 
-    # Entry/SL/TP
+    # Entry / SL / TP
     entry = round(price, 6)
     if direction == "LONG":
-        sl = round(min(
-            pullback_ema * 0.998 if pullback_ema else entry,
-            entry * (1 - SL_PERCENT/100)
-        ), 6)
+        sl_base = pullback_ema * 0.998 if pullback_ema else entry * (1 - SL_PERCENT/100)
+        sl = round(min(sl_base, entry * (1 - SL_PERCENT/100)), 6)
         tp = round(entry + (entry - sl) * RR_RATIO, 6)
     else:
-        sl = round(max(
-            pullback_ema * 1.002 if pullback_ema else entry,
-            entry * (1 + SL_PERCENT/100)
-        ), 6)
+        sl_base = pullback_ema * 1.002 if pullback_ema else entry * (1 + SL_PERCENT/100)
+        sl = round(max(sl_base, entry * (1 + SL_PERCENT/100)), 6)
         tp = round(entry - (sl - entry) * RR_RATIO, 6)
 
     sl_pct = abs(round((sl - entry) / entry * 100, 2))
     tp_pct = abs(round((tp - entry) / entry * 100, 2))
 
-    _set_cooldown(symbol, direction)
+    # Lưu trạng thái IN_TRADE
+    _set_trade(symbol, direction, entry, sl, tp)
 
     return {
         "type":         direction,
