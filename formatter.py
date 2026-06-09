@@ -159,42 +159,48 @@ def format_strategy_c(symbol: str, sig: dict) -> str:
 # ════════════════════════════════════════════════════════════
 #  CHUNG — startup / status / heartbeat
 # ════════════════════════════════════════════════════════════
-def format_startup(symbols_a, symbols_b, symbols_c=None) -> str:
+def format_startup(symbols_a, symbols_b, symbols_c=None, symbols_d=None) -> str:
     ca = _fmt(symbols_a)
     cb = _fmt(symbols_b)
     cc = _fmt(symbols_c) if symbols_c is not None else "Trống"
+    cd = _fmt(symbols_d) if symbols_d is not None else "Trống"
     return (
         f"✅  BOT CRYPTO ALERT BẬT\n"
         f"🕐 {_now()}\n"
         f"━━━━━━━━━━━━━━━━━━━━\n"
-        f"☁️  CL A (Ichimoku)   : {ca}\n"
-        f"📈 CL B (EMA+MACD)    : {cb}\n"
-        f"⚡ CL C (Supertrend)  : {cc}\n"
+        f"☁️  CL A (Ichimoku)    : {ca}\n"
+        f"📈 CL B (EMA+MACD)     : {cb}\n"
+        f"⚡ CL C (Supertrend)   : {cc}\n"
+        f"🌊 CL D (IchiStoch)    : {cd}\n"
         f"⚖️ R:R : 1:{RR_RATIO}  ·  SL {SL_PERCENT}%\n"
         f"━━━━━━━━━━━━━━━━━━━━\n"
-        f"/aa /ra — CL A  ·  /ab /rb — CL B  ·  /ac /rc — CL C\n"
-        f"/add /remove — cả 3\n"
-        f"/strategy_a  /strategy_b  /strategy_c\n"
-        f"/confirms  /set_confirm  /status"
+        f"/aa /ra — CL A  ·  /ab /rb — CL B\n"
+        f"/ac /rc — CL C  ·  /ad /rd — CL D\n"
+        f"/add /remove — cả 4\n"
+        f"/strategy_a /strategy_b /strategy_c /strategy_d\n"
+        f"/confirms /set_confirm /status"
     )
 
 
 def format_status(symbols_a, symbols_b, strategies=None,
-                  symbols_c=None, confirms_c=None) -> str:
+                  symbols_c=None, confirms_c=None, symbols_d=None) -> str:
     ca = _fmt_list(symbols_a)
     cb = _fmt_list(symbols_b)
     cc = _fmt_list(symbols_c) if symbols_c else "  (Trống)"
+    cd = _fmt_list(symbols_d) if symbols_d else "  (Trống)"
 
     if strategies:
         sa = "✅ BẬT" if strategies.get("ichimoku")   else "❌ TẮT"
         sb = "✅ BẬT" if strategies.get("ema")         else "❌ TẮT"
         sc = "✅ BẬT" if strategies.get("supertrend")  else "❌ TẮT"
+        sd = "✅ BẬT" if strategies.get("ichistoch")   else "❌ TẮT"
         strat = (
             f"━━━━━━━━━━━━━━━━━━━━\n"
             f"⚙️  Chiến lược:\n"
             f"  ☁️  A — Ichimoku    : {sa}\n"
             f"  📈 B — EMA+MACD    : {sb}\n"
             f"  ⚡ C — Supertrend  : {sc}\n"
+            f"  🌊 D — IchiStoch   : {sd}\n"
         )
     else:
         strat = ""
@@ -213,6 +219,8 @@ def format_status(symbols_a, symbols_b, strategies=None,
         f"📈 CL B (EMA+MACD):\n{cb}\n"
         f"━━━━━━━━━━━━━━━━━━━━\n"
         f"⚡ CL C (Supertrend):\n{cc}\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"🌊 CL D (IchiStoch):\n{cd}\n"
         f"{strat}"
         f"{conf_line}"
         f"━━━━━━━━━━━━━━━━━━━━\n"
@@ -221,13 +229,15 @@ def format_status(symbols_a, symbols_b, strategies=None,
 
 
 def format_heartbeat(symbols_a, symbols_b, strategies,
-                     symbols_c=None) -> str:
+                     symbols_c=None, symbols_d=None) -> str:
     ca = _fmt(symbols_a)
     cb = _fmt(symbols_b)
     cc = _fmt(symbols_c) if symbols_c else "Trống"
+    cd = _fmt(symbols_d) if symbols_d else "Trống"
     sa = "✅" if strategies.get("ichimoku")  else "❌"
     sb = "✅" if strategies.get("ema")        else "❌"
     sc = "✅" if strategies.get("supertrend") else "❌"
+    sd = "✅" if strategies.get("ichistoch")  else "❌"
     return (
         f"💚  BOT ĐANG HOẠT ĐỘNG\n"
         f"🕐 {_now()}\n"
@@ -235,6 +245,7 @@ def format_heartbeat(symbols_a, symbols_b, strategies,
         f"☁️  CL A {sa}: {ca}\n"
         f"📈 CL B {sb}: {cb}\n"
         f"⚡ CL C {sc}: {cc}\n"
+        f"🌊 CL D {sd}: {cd}\n"
         f"━━━━━━━━━━━━━━━━━━━━\n"
         f"✅ Hoạt động bình thường"
     )

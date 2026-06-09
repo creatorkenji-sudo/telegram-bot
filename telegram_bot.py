@@ -24,7 +24,7 @@ def _fmt_list(symbols: list) -> str:
 # ── Lệnh chung ───────────────────────────────────────────────
 def cmd_start(update, context):
     update.message.reply_text(format_startup(
-        state["symbols_a"], state["symbols_b"], state["symbols_c"]
+        state["symbols_a"], state["symbols_b"], state["symbols_c"], state["symbols_d"]
     ))
 
 def cmd_add(update, context):
@@ -69,7 +69,7 @@ def cmd_list(update, context):
 def cmd_status(update, context):
     update.message.reply_text(format_status(
         state["symbols_a"], state["symbols_b"], state["strategies"],
-        state["symbols_c"], state["confirms_c"]
+        state["symbols_c"], state["confirms_c"], state["symbols_d"]
     ))
 
 
