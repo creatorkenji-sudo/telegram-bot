@@ -10,12 +10,14 @@ state = {
     "symbols_a": list(DEFAULT_SYMBOLS),   # Chiến lược A
     "symbols_b": list(DEFAULT_SYMBOLS),   # Chiến lược B
     "symbols_c": list(DEFAULT_SYMBOLS),   # Chiến lược C
+    "symbols_d": list(DEFAULT_SYMBOLS),   # Chiến lược D
 
     # ── Bật/tắt chiến lược — khai báo đầy đủ ngay từ đầu ────
     "strategies": {
         "ichimoku":   True,
         "ema":        True,
         "supertrend": True,
+        "ichistoch":  True,   # Chiến lược D
     },
 
     # ── Confirmation CL C ─────────────────────────────────────
@@ -26,6 +28,7 @@ state = {
     "last_entry_signal": {},
     "last_ema_signal":   {},
     "last_c_signal":     {},
+    "last_d_signal":     {},
 
     # ── Bộ lọc Chiến lược B ──────────────────────────────────
     "filters_b": {
@@ -93,14 +96,31 @@ def remove_symbol_c(symbol: str) -> bool:
     return False
 
 
+
+
+def add_symbol_d(symbol: str) -> bool:
+    s = symbol.upper()
+    if s not in state["symbols_d"]:
+        state["symbols_d"].append(s)
+        return True
+    return False
+
+def remove_symbol_d(symbol: str) -> bool:
+    s = symbol.upper()
+    if s in state["symbols_d"]:
+        state["symbols_d"].remove(s)
+        state["last_d_signal"].pop(s, None)
+        return True
+    return False
+
 # ── Thêm/xóa cả 3 ────────────────────────────────────────────
 def add_symbol(symbol: str) -> bool:
     s = symbol.upper()
-    return add_symbol_a(s) | add_symbol_b(s) | add_symbol_c(s)
+    return add_symbol_a(s) | add_symbol_b(s) | add_symbol_c(s) | add_symbol_d(s)
 
 def remove_symbol(symbol: str) -> bool:
     s = symbol.upper()
-    return remove_symbol_a(s) | remove_symbol_b(s) | remove_symbol_c(s)
+    return remove_symbol_a(s) | remove_symbol_b(s) | remove_symbol_c(s) | remove_symbol_d(s)
 
 
 # ── Bật/tắt chiến lược ───────────────────────────────────────

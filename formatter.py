@@ -240,6 +240,51 @@ def format_heartbeat(symbols_a, symbols_b, strategies,
     )
 
 
+
+
+# ════════════════════════════════════════════════════════════
+#  CHIẾN LƯỢC D — Ichimoku + Stochastic
+# ════════════════════════════════════════════════════════════
+def format_strategy_d(symbol: str, sig: dict) -> str:
+    coin  = symbol.replace("USDT", "")
+    entry = sig["entry"]
+    is_early   = sig["signal_type"] == "early"
+    is_long    = sig["type"] == "LONG"
+
+    if is_long:
+        bar   = "🌊🟢══════════════════🟢🌊"
+        title = f"{'⚡ CẢNH BÁO SỚM' if is_early else '🚀 VÀO LỆNH'} LONG — {coin}/USDT"
+        trend = "🐂 Xu hướng H1: TĂNG (Giá > Kumo + Tenkan > Kijun)"
+    else:
+        bar   = "🌊🔴══════════════════🔴🌊"
+        title = f"{'⚡ CẢNH BÁO SỚM' if is_early else '🚀 VÀO LỆNH'} SHORT — {coin}/USDT"
+        trend = "🐻 Xu hướng H1: GIẢM (Giá < Kumo + Tenkan < Kijun)"
+
+    note = "⚡ Chờ nến xác nhận đóng cửa trước khi vào!" if is_early else "✅ Nến đã xác nhận — có thể vào lệnh"
+
+    return (
+        f"{bar}\n{title}\n"
+        f"🕐 {_now()} · ⏰ H1 + 15m\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"💰 Giá hiện tại  : {entry:,.4f} USDT\n"
+        f"📍 Điểm vào      : {entry:,.4f}\n"
+        f"🛡 Cắt lỗ (SL)  : {sig['sl']:,.4f}  (−{sig['sl_pct']}%)\n"
+        f"🎯 Chốt lời (TP) : {sig['tp']:,.4f}  (+{sig['tp_pct']}%)\n"
+        f"⚖️ R:R            : 1:{RR_RATIO}\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"{trend}\n"
+        f"📊 Tenkan H1     : {sig['h1_tenkan']}\n"
+        f"📊 Kijun H1      : {sig['h1_kijun']}\n"
+        f"⚡ Stoch H1      : {sig['h1_k']}\n"
+        f"⚡ Stoch 15m     : {sig['m15_k']}\n"
+        f"📌 Lý do         : {sig['stoch_reason']}\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"{note}\n"
+        f"🌊 Chiến lược D — Ichimoku + Stochastic\n"
+        f"⚠️ Không phải lời khuyên đầu tư!\n"
+        f"{bar}"
+    )
+
 # Alias
 format_entry = format_ichimoku_entry
 format_setup = format_ichimoku_entry

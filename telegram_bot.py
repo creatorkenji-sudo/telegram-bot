@@ -9,6 +9,8 @@ from state import (
     add_symbol, remove_symbol,
     add_symbol_a, remove_symbol_a,
     add_symbol_b, remove_symbol_b,
+    add_symbol_c, remove_symbol_c,
+    add_symbol_d, remove_symbol_d,
     toggle_strategy, strategy_status,
 )
 from config import TOKEN
@@ -226,6 +228,33 @@ def cmd_minpass_b(update, context):
     )
 
 
+
+def cmd_strategy_d(update, context):
+    new = toggle_strategy("ichistoch")
+    icon = "✅ BẬT" if new else "❌ TẮT"
+    update.message.reply_text(f"🌊 Chiến lược D — Ichimoku + Stochastic\nTrạng thái mới: {icon}\n\n{strategy_status()}")
+
+def cmd_ad(update, context):
+    if not context.args:
+        update.message.reply_text("❌ Dùng: /ad BTCUSDT")
+        return
+    symbol = _clean(context.args[0])
+    if add_symbol_d(symbol):
+        update.message.reply_text(f"✅ Đã thêm {symbol} vào CL D\n🌊 CL D: {_fmt_list(state['symbols_d'])}")
+    else:
+        update.message.reply_text(f"⚠️ {symbol} đã có trong CL D rồi")
+
+def cmd_rd(update, context):
+    if not context.args:
+        update.message.reply_text("❌ Dùng: /rd BTCUSDT")
+        return
+    symbol = _clean(context.args[0])
+    if remove_symbol_d(symbol):
+        update.message.reply_text(f"🗑 Đã xóa {symbol} khỏi CL D\n🌊 CL D: {_fmt_list(state['symbols_d'])}")
+    else:
+        update.message.reply_text(f"⚠️ {symbol} không có trong CL D")
+
+
 def run_telegram():
     updater = Updater(TOKEN, use_context=True)
     updater.bot.delete_webhook(drop_pending_updates=True)
@@ -437,11 +466,39 @@ def cmd_minpass_b(update, context):
     )
 
 
-def run_telegram():
-    updater = Updater(TOKEN, use_context=True)
-    updater.bot.delete_webhook(drop_pending_updates=True)
+def _error_handler(update, context):
+    """Bắt lỗi Conflict — log và tiếp tục, không crash."""
+    from telegram.error import Conflict, NetworkError
+    err = context.error
+    if isinstance(err, Conflict):
+        print(f"  ⚠️  Telegram Conflict — có instance khác đang chạy. Bỏ qua.")
+    elif isinstance(err, NetworkError):
+        print(f"  ⚠️  NetworkError: {err}. Sẽ thử lại...")
+    else:
+        print(f"  ❌ Telegram error: {err}")
 
-    dp = updater.dispatcher
+
+def run_telegram():
+    import time
+    from telegram.error import Conflict
+
+    # Xóa webhook + pending updates trước khi polling
+    try:
+        from telegram import Bot
+        Bot(token=TOKEN).delete_webhook(drop_pending_updates=True)
+        print("  🧹 Webhook đã xóa")
+    except Exception as e:
+        print(f"  ⚠️  Xóa webhook lỗi: {e}")
+
+    # Đợi 3 giây để instance cũ có thời gian tắt hoàn toàn
+    time.sleep(3)
+
+    updater = Updater(TOKEN, use_context=True)
+    dp      = updater.dispatcher
+
+    # Đăng ký error handler — tránh crash khi có conflict
+    dp.add_error_handler(_error_handler)
+
     dp.add_handler(CommandHandler("start",          cmd_start))
     dp.add_handler(CommandHandler("add",            cmd_add))
     dp.add_handler(CommandHandler("remove",         cmd_remove))
@@ -464,6 +521,13 @@ def run_telegram():
     dp.add_handler(CommandHandler("panel_b",        cmd_panel_b))
     dp.add_handler(CommandHandler("filter_b",       cmd_filter_b))
     dp.add_handler(CommandHandler("minpass_b",      cmd_minpass_b))
+    dp.add_handler(CommandHandler("strategy_d",     cmd_strategy_d))
+    dp.add_handler(CommandHandler("ad",             cmd_ad))
+    dp.add_handler(CommandHandler("rd",             cmd_rd))
 
-    updater.start_polling()
+    # start_polling với allowed_updates để giảm load
+    updater.start_polling(
+        drop_pending_updates=True,
+        allowed_updates=["message"],
+    )
     print("✅ Telegram bot polling...")

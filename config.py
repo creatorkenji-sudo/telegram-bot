@@ -1,31 +1,33 @@
 # ============================================================
 #  config.py — Toàn bộ cấu hình tại đây
 # ============================================================
+import os
 
-TOKEN   = "8965760476:AAHPcQYrJcse8Pk_8ynb7shJxTdmZVA-Qd8"
-CHAT_ID = "7648621364"
+# ── Telegram ─────────────────────────────────────────────────
+TOKEN   = os.environ.get("TOKEN", "8965760476:AAHPcQYrJcse8Pk_8ynb7shJxTdmZVA-Qd8")
+CHAT_ID = os.environ.get("CHAT_ID", "7648621364")
 
-# Danh sách coin mặc định khi khởi động (thêm/xóa qua Telegram)
-DEFAULT_SYMBOLS = ["RECALLUSDT","EDGEUSDT","NEARUSDT","ONDOUSDT","HYPEUSDT","BTCUSDT", "ETHUSDT"]
-
-# Bybit
+# ── Bybit ────────────────────────────────────────────────────
 BASE_URL = "https://api.bybit.com"
 LIMIT    = 200
 
-# Khung giờ cố định
+# ── Coin mặc định khi khởi động ──────────────────────────────
+DEFAULT_SYMBOLS = ["HYPEUSDT", "NEARUSDT"]
+
+# ── Khung thời gian ──────────────────────────────────────────
 TIMEFRAMES = {
-    "h4":   "240",   # xác định xu hướng lớn
-    "h1":   "60",    # xác nhận trend
-    "m15":  "15",    # tìm điểm vào lệnh
+    "h4":  "240",
+    "h1":  "60",
+    "m15": "15",
 }
 
-# Risk:Reward — SL = X%, TP = X% * RR_RATIO
-SL_PERCENT = 2.0       # % cắt lỗ tính từ entry
-RR_RATIO   = 3         # TP = SL * 3  →  R:R = 1:3
+# ── Risk / Reward ─────────────────────────────────────────────
+SL_PERCENT = 2.0
+RR_RATIO   = 3
 
-# Ngưỡng StochRSI
+# ── Stochastic ngưỡng ────────────────────────────────────────
 STOCH_OVERSOLD   = 20
 STOCH_OVERBOUGHT = 80
 
-# Vòng lặp
-CHECK_INTERVAL = 60    # giây
+# ── Vòng lặp ─────────────────────────────────────────────────
+CHECK_INTERVAL = 60   # giây
