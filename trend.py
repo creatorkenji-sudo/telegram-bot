@@ -1,14 +1,22 @@
 # ============================================================
 #  trend.py — Xác định xu hướng Ichimoku H4 + H1
+#  Dùng iloc[-2] = nến ĐÃ ĐÓNG để xác nhận trend
 # ============================================================
 from indicators import ichimoku
 
 
 def get_trend(df):
-    tenkan, kijun, sa, sb, chikou = ichimoku(df)
-    price     = df["close"].iloc[-1]
-    cloud_top = max(sa.iloc[-1], sb.iloc[-1])
-    cloud_bot = min(sa.iloc[-1], sb.iloc[-1])
+    """
+    Dùng nến đã đóng [-2] để xác định trend.
+    Trả về: 'UP' | 'DOWN' | 'SIDE'
+    """
+    tenkan, kijun, sa, sb, _ = ichimoku(df)
+
+    # Dùng nến đã đóng [-2]
+    price     = df["close"].iloc[-2]
+    cloud_top = max(sa.iloc[-2], sb.iloc[-2])
+    cloud_bot = min(sa.iloc[-2], sb.iloc[-2])
+
     if price > cloud_top:
         return "UP"
     elif price < cloud_bot:
@@ -17,8 +25,13 @@ def get_trend(df):
 
 
 def multi_trend(df_h4, df_h1):
+    """
+    Cả H4 và H1 phải đồng thuận.
+    Trả về: 'UPTREND' | 'DOWNTREND' | 'NO_TREND'
+    """
     t4 = get_trend(df_h4)
     t1 = get_trend(df_h1)
+
     if t4 == "UP"   and t1 == "UP":
         return "UPTREND"
     if t4 == "DOWN" and t1 == "DOWN":
@@ -27,15 +40,25 @@ def multi_trend(df_h4, df_h1):
 
 
 def detect_kumo_cross(df):
-    tenkan, kijun, sa, sb, chikou = ichimoku(df)
-    cloud_top_cur  = max(sa.iloc[-1], sb.iloc[-1])
-    cloud_top_prev = max(sa.iloc[-2], sb.iloc[-2])
-    cloud_bot_cur  = min(sa.iloc[-1], sb.iloc[-1])
-    cloud_bot_prev = min(sa.iloc[-2], sb.iloc[-2])
-    prev_price = df["close"].iloc[-2]
-    curr_price = df["close"].iloc[-1]
-    if prev_price <= cloud_top_prev and curr_price > cloud_top_cur:
+    """
+    Phát hiện giá vừa cắt qua mây — dùng nến [-2] và [-3].
+    Trả về: 'UP' | 'DOWN' | None
+    """
+    tenkan, kijun, sa, sb, _ = ichimoku(df)
+
+    # Nến đã đóng [-2] so với nến trước đó [-3]
+    curr_price = df["close"].iloc[-2]
+    prev_price = df["close"].iloc[-3]
+
+    curr_top = max(sa.iloc[-2], sb.iloc[-2])
+    curr_bot = min(sa.iloc[-2], sb.iloc[-2])
+    prev_top = max(sa.iloc[-3], sb.iloc[-3])
+    prev_bot = min(sa.iloc[-3], sb.iloc[-3])
+
+    # Cắt lên trên mây
+    if prev_price <= prev_top and curr_price > curr_top:
         return "UP"
-    if prev_price >= cloud_bot_prev and curr_price < cloud_bot_cur:
+    # Cắt xuống dưới mây
+    if prev_price >= prev_bot and curr_price < curr_bot:
         return "DOWN"
     return None
