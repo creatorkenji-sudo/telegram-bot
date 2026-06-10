@@ -236,7 +236,7 @@ def get_stats() -> str:
 
     # Chi tiết từng CL
     for s in strategies:
-        cl_trades = [h for h in recent if s in h.get("strategy","").upper()]
+        cl_trades = [h for h in recent if h.get("strategy","").upper() == f"CL_{s}"]
         if not cl_trades:
             continue
         cl_tp = sum(1 for h in cl_trades if h["result"] == "TP")
@@ -250,7 +250,7 @@ def get_stats() -> str:
     if n_active:
         lines.append(f"━━━━━━━━━━━━━━━━━━━━")
         lines.append(f"🔒 Đang mở: {n_active} lệnh")
-        for k, t in list(active.items())[:5]:
+        for k, t in sorted(active.items(), key=lambda x: x[1].get("ts_entry",0), reverse=True)[:5]:
             elapsed = round((time.time() - t["ts_entry"]) / 3600, 1)
             lines.append(f"  • {t['strategy']} {t['symbol'].replace('USDT','')} {t['direction']} {elapsed}h")
 
