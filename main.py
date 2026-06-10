@@ -6,6 +6,7 @@ import requests
 from datetime import datetime
 
 from data import get_klines
+from trade_tracker import track_entry, check_all, format_result, get_stats, reset_history
 from strategy_c import check_strategy_c
 from strategy_d import check_strategy_d
 from trend import multi_trend, detect_kumo_cross
@@ -28,6 +29,12 @@ def send(text: str):
     except Exception as e:
         print(f"  ❌ Telegram lỗi: {e}")
 
+
+
+def _get_current_price(symbol: str) -> float:
+    """Lấy giá hiện tại cho tracker."""
+    df = get_klines(symbol, "1")   # nến 1 phút để lấy giá mới nhất
+    return df["close"].iloc[-1]
 
 # ── Chiến lược A: Ichimoku + StochRSI ───────────────────────
 def run_strategy_a(symbol: str):
@@ -72,6 +79,7 @@ def run_strategy_a(symbol: str):
     if setup and setup["type"] != state["last_entry_signal"].get(symbol):
         send(format_ichimoku_entry(symbol, trend, "15m", setup))
         state["last_entry_signal"][symbol] = setup["type"]
+        track_entry(symbol, "CL_A", setup["type"], setup["entry"], setup["sl"], setup["tp"])
         print(f"  📍 [A] {symbol}: {setup['type']} ${setup['entry']}")
     elif not setup:
         state["last_entry_signal"][symbol] = None
@@ -120,6 +128,7 @@ def run_strategy_b(symbol: str):
     if sig:
         send(format_ema_signal(symbol, sig))
         state["last_ema_signal"][symbol] = sig["type"]
+        track_entry(symbol, "CL_B", sig["type"], sig["entry"], sig["sl"], sig["tp"])
         print(f"  📈 [B] {symbol}: {sig['type']} entry={sig['entry']} score={sig['score']}")
     else:
         print(f"  —  [B] {symbol}: ${price:,.4f} | tìm setup...")
@@ -137,6 +146,7 @@ def run_strategy_c(symbol: str):
     if sig and sig["type"] != state["last_c_signal"].get(symbol):
         send(format_strategy_c(symbol, sig))
         state["last_c_signal"][symbol] = sig["type"]
+        track_entry(symbol, "CL_C", sig["type"], sig["entry"], sig["sl"], sig["tp"])
         print(f"  ⚡ [C] {symbol}: {sig['type']} ${sig['entry']} score={sig['score']}")
     elif not sig:
         state["last_c_signal"][symbol] = None
@@ -153,6 +163,7 @@ def run_strategy_d(symbol: str):
     if sig:
         send(format_strategy_d(symbol, sig))
         state["last_d_signal"][symbol] = sig["type"]
+        track_entry(symbol, "CL_D", sig["type"], sig["entry"], sig["sl"], sig["tp"])
         label = "⚡ Early" if sig["signal_type"] == "early" else "🚀 Confirm"
         print(f"  {label} [D] {symbol}: {sig['type']} ${sig['entry']}")
     else:
@@ -200,6 +211,14 @@ def main():
                 run_strategy_b(symbol)
             except Exception as e:
                 print(f"  ❌ [B] {symbol}: {e}")
+
+        # Tracker: check SL/TP tất cả lệnh đang mở
+        try:
+            closed = check_all(_get_current_price)
+            for record in closed:
+                send(format_result(record))
+        except Exception as e:
+            print(f"  ⚠️  Tracker check lỗi: {e}")
 
         # Heartbeat mỗi 1 giờ
         if time.time() - last_heartbeat >= 3600:

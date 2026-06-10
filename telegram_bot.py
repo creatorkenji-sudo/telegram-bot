@@ -284,6 +284,20 @@ def cmd_reset_b(update, context):
         update.message.reply_text("ℹ️ Không có lệnh nào đang IN_TRADE")
 
 
+
+def cmd_stats(update, context):
+    """Xem thống kê tất cả chiến lược 7 ngày."""
+    from trade_tracker import get_stats
+    update.message.reply_text(get_stats())
+
+
+def cmd_reset_tracker(update, context):
+    """Xóa lịch sử thống kê."""
+    from trade_tracker import reset_history
+    reset_history()
+    update.message.reply_text("🗑 Đã xóa lịch sử thống kê.")
+
+
 def run_telegram():
     updater = Updater(TOKEN, use_context=True)
     updater.bot.delete_webhook(drop_pending_updates=True)
@@ -551,6 +565,8 @@ def run_telegram():
     dp.add_handler(CommandHandler("filter_b",       cmd_filter_b))
     dp.add_handler(CommandHandler("minpass_b",      cmd_minpass_b))
     dp.add_handler(CommandHandler("reset_b",         cmd_reset_b))
+    dp.add_handler(CommandHandler("stats",           cmd_stats))
+    dp.add_handler(CommandHandler("reset_tracker",   cmd_reset_tracker))
     dp.add_handler(CommandHandler("strategy_d",     cmd_strategy_d))
     dp.add_handler(CommandHandler("ad",             cmd_ad))
     dp.add_handler(CommandHandler("rd",             cmd_rd))
