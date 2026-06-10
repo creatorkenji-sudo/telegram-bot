@@ -307,6 +307,51 @@ def format_strategy_d(symbol: str, sig: dict) -> str:
         f"{bar}"
     )
 
+
+
+def format_sltp_result(symbol: str, result: dict) -> str:
+    """Thông báo khi SL/TP/Timeout chạm."""
+    coin      = symbol.replace("USDT","")
+    rtype     = result["type"]
+    direction = result["direction"]
+    entry     = result["entry"]
+    exit_p    = result["exit_price"]
+    pnl       = result["pnl_pct"]
+
+    if rtype == "TP":
+        bar   = "🎯🟢══════════════════🟢🎯"
+        title = f"✅ CHỐT LỜI — {coin}/USDT"
+        icon  = "💰"
+        pnl_str = f"+{pnl}%"
+        note  = "Tìm lệnh mới sau cooldown 30 phút"
+    elif rtype == "SL":
+        bar   = "🛡🔴══════════════════🔴🛡"
+        title = f"❌ CẮT LỖ — {coin}/USDT"
+        icon  = "💸"
+        pnl_str = f"{pnl}%"
+        note  = "Tìm lệnh mới sau cooldown 30 phút"
+    else:
+        bar   = "⏰⬜══════════════════⬜⏰"
+        title = f"⏰ TIMEOUT 8H — {coin}/USDT"
+        icon  = "📊"
+        pnl_str = f"{pnl:+.2f}%"
+        note  = f"Đã giữ {result.get('hours',8)}h — reset tìm lệnh mới"
+
+    dir_icon = "🟢 LONG" if direction == "LONG" else "🔴 SHORT"
+    return (
+        f"{bar}\n{title}\n"
+        f"🕐 {_now()}\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"📍 Hướng lệnh   : {dir_icon}\n"
+        f"📍 Giá vào      : {entry:,.4f}\n"
+        f"{icon} Giá thoát    : {exit_p:,.4f}\n"
+        f"📊 P&L          : {pnl_str}\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"ℹ️ {note}\n"
+        f"📈 Chiến lược B — EMA Pullback + MACD\n"
+        f"{bar}"
+    )
+
 # Alias
 format_entry = format_ichimoku_entry
 format_setup = format_ichimoku_entry
