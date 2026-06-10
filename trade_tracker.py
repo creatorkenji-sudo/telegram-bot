@@ -43,7 +43,7 @@ def _now_ts() -> float:
 
 
 def _now_str() -> str:
-    return datetime.now(TZ_VN).strftime("%d/%m %H:%M")
+    return datetime.now(TZ_VN).strftime("%d/%m %H:%M") + " (UTC+7)"
 
 
 # ════════════════════════════════════════════════════════════
@@ -208,7 +208,8 @@ def get_stats() -> str:
             f"📊 THỐNG KÊ BOT — 7 ngày\n"
             f"🕐 {_now_str()}\n"
             f"━━━━━━━━━━━━━━━━━━━━\n"
-            f"Chưa có lệnh nào được ghi nhận."
+            f"Chưa có lệnh đã đóng.\n"
+            f"(Lệnh đang mở sẽ được tính khi chạm TP/SL)"
         )
 
     # Tổng hợp theo chiến lược
