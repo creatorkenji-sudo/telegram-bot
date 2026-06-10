@@ -255,6 +255,35 @@ def cmd_rd(update, context):
         update.message.reply_text(f"⚠️ {symbol} không có trong CL D")
 
 
+
+def cmd_reset_b(update, context):
+    """Reset tay tất cả lệnh đang IN_TRADE của CL B."""
+    from ema_strategy import _trades, _save_trades, get_trade_state
+    symbols = context.args if context.args else list(state["symbols_b"])
+    reset_list = []
+    for s in symbols:
+        sym = s.upper()
+        if not sym.endswith("USDT"):
+            sym += "USDT"
+        t = get_trade_state(sym)
+        if t["status"] == "IN_TRADE":
+            t["status"]      = "IDLE"
+            t["direction"]   = None
+            t["entry"]       = None
+            t["sl"]          = None
+            t["tp"]          = None
+            t["ts_entry"]    = None
+            t["ts_cooldown"] = None
+            reset_list.append(sym)
+    _save_trades(_trades)
+    if reset_list:
+        update.message.reply_text(
+            f"🔓 Đã reset CL B:\n" + "\n".join(f"  • {s}" for s in reset_list)
+        )
+    else:
+        update.message.reply_text("ℹ️ Không có lệnh nào đang IN_TRADE")
+
+
 def run_telegram():
     updater = Updater(TOKEN, use_context=True)
     updater.bot.delete_webhook(drop_pending_updates=True)
@@ -521,6 +550,7 @@ def run_telegram():
     dp.add_handler(CommandHandler("panel_b",        cmd_panel_b))
     dp.add_handler(CommandHandler("filter_b",       cmd_filter_b))
     dp.add_handler(CommandHandler("minpass_b",      cmd_minpass_b))
+    dp.add_handler(CommandHandler("reset_b",         cmd_reset_b))
     dp.add_handler(CommandHandler("strategy_d",     cmd_strategy_d))
     dp.add_handler(CommandHandler("ad",             cmd_ad))
     dp.add_handler(CommandHandler("rd",             cmd_rd))

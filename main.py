@@ -10,11 +10,11 @@ from strategy_c import check_strategy_c
 from strategy_d import check_strategy_d
 from trend import multi_trend, detect_kumo_cross
 from entry import check_entry
-from ema_strategy import check_ema_signal
+from ema_strategy import check_ema_signal, check_sltp, get_trade_state
 from telegram_bot import run_telegram
 from formatter import (
     format_kumo_cross, format_ichimoku_entry,
-    format_ema_signal, format_startup, format_heartbeat,
+    format_ema_signal, format_sltp_result, format_startup, format_heartbeat,
     format_strategy_c, format_strategy_d
 )
 from state import state
@@ -78,23 +78,51 @@ def run_strategy_a(symbol: str):
         print(f"  —  [A] {symbol}: trend={trend} | ${price:,.4f}")
 
 
+
+def _in_cooldown_b(symbol: str, t: dict) -> tuple[bool, int]:
+    from ema_strategy import COOLDOWN_SECONDS
+    if t["ts_cooldown"] is None:
+        return False, 0
+    remaining = COOLDOWN_SECONDS - (time.time() - t["ts_cooldown"])
+    return (True, int(remaining // 60)) if remaining > 0 else (False, 0)
+
 # ── Chiến lược B: EMA Pullback + MACD ───────────────────────
 def run_strategy_b(symbol: str):
     if not state["strategies"]["ema"]:
         return
-    df_h1  = get_klines(symbol, TIMEFRAMES["h1"])
     df_m15 = get_klines(symbol, TIMEFRAMES["m15"])
     price  = df_m15["close"].iloc[-1]
-    sig    = check_ema_signal(symbol, df_h1, df_m15,
-                          state["filters_b"], state["min_pass_b"])
 
-    if sig and sig["type"] != state["last_ema_signal"].get(symbol):
+    # 1. Kiểm tra trạng thái hiện tại
+    t = get_trade_state(symbol)
+
+    # Đang IN_TRADE — chỉ check SL/TP/Timeout, KHÔNG tìm lệnh mới
+    if t["status"] == "IN_TRADE":
+        elapsed = round((time.time() - t["ts_entry"]) / 3600, 1)
+        result  = check_sltp(symbol, price)
+        if result:
+            send(format_sltp_result(symbol, result))
+            label = {"TP": "✅ TP", "SL": "❌ SL", "TIMEOUT": "⏰ Timeout"}[result["type"]]
+            print(f"  {label} [B] {symbol}: {result['direction']} pnl={result['pnl_pct']}%")
+        else:
+            print(f"  🔒 [B] {symbol}: IN_TRADE {t['direction']} {elapsed:.1f}h/2h | ${price:,.4f} | SL={t['sl']} TP={t['tp']}")
+        return  # ← thoát hẳn, không tìm lệnh mới
+
+    # 2. IDLE — kiểm tra cooldown rồi tìm lệnh mới
+    in_cd, mins_left = _in_cooldown_b(symbol, t)
+    if in_cd:
+        print(f"  ⏳ [B] {symbol}: cooldown còn {mins_left} phút")
+        return
+
+    df_h1 = get_klines(symbol, TIMEFRAMES["h1"])
+    sig   = check_ema_signal(symbol, df_h1, df_m15,
+                              state["filters_b"], state["min_pass_b"])
+    if sig:
         send(format_ema_signal(symbol, sig))
         state["last_ema_signal"][symbol] = sig["type"]
-        print(f"  📈 [B] {symbol}: {sig['type']} {sig['pullback_ema']} score={sig['score']}")
-    elif not sig:
-        state["last_ema_signal"][symbol] = None
-        print(f"  —  [B] {symbol}: ${price:,.4f} | chưa đủ 2/3")
+        print(f"  📈 [B] {symbol}: {sig['type']} entry={sig['entry']} score={sig['score']}")
+    else:
+        print(f"  —  [B] {symbol}: ${price:,.4f} | tìm setup...")
 
 
 

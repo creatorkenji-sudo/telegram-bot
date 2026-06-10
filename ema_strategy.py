@@ -6,7 +6,7 @@
 #  2. Mỗi vòng lặp kiểm tra giá hiện tại vs SL/TP
 #  3. Nếu chạm SL → báo "Cắt lỗ" → reset → tìm lệnh mới
 #  4. Nếu chạm TP → báo "Chốt lời" → reset → tìm lệnh mới
-#  5. Timeout 2 giờ → reset
+#  5. Timeout 8 giờ → reset
 # ============================================================
 import time
 import pandas as pd
@@ -19,13 +19,29 @@ MACD_MIN_FLIP     = 0.0001
 TREND_CONSISTENCY = 3
 TIMEOUT_SECONDS   = 2 * 3600  # 2 giờ timeout
 
-# ── Trade state per symbol ────────────────────────────────────
-# symbol -> {
-#   status: "IDLE" | "IN_TRADE"
-#   direction, entry, sl, tp
-#   ts_entry, ts_cooldown
-# }
-_trades: dict = {}
+# ── Trade state per symbol — lưu file để persist qua restart ──
+import json, os
+
+TRADE_FILE = "/tmp/ema_trades.json"
+
+def _load_trades() -> dict:
+    try:
+        if os.path.exists(TRADE_FILE):
+            with open(TRADE_FILE, "r") as f:
+                return json.load(f)
+    except Exception:
+        pass
+    return {}
+
+def _save_trades(trades: dict):
+    try:
+        with open(TRADE_FILE, "w") as f:
+            json.dump(trades, f)
+    except Exception as e:
+        print(f"  ⚠️  Save trades lỗi: {e}")
+
+# Load từ file khi khởi động
+_trades: dict = _load_trades()
 
 
 def get_trade_state(symbol: str) -> dict:
@@ -58,6 +74,7 @@ def _set_trade(symbol: str, direction: str, entry: float, sl: float, tp: float):
     t["sl"]        = sl
     t["tp"]        = tp
     t["ts_entry"]  = time.time()
+    _save_trades(_trades)
 
 
 def _reset_trade(symbol: str):
@@ -68,7 +85,8 @@ def _reset_trade(symbol: str):
     t["sl"]          = None
     t["tp"]          = None
     t["ts_entry"]    = None
-    t["ts_cooldown"] = time.time()  # bắt đầu cooldown
+    t["ts_cooldown"] = time.time()
+    _save_trades(_trades)
 
 
 # ── Check SL/TP/Timeout ───────────────────────────────────────
@@ -87,7 +105,7 @@ def check_sltp(symbol: str, current_price: float) -> dict | None:
     tp        = t["tp"]
     elapsed   = time.time() - t["ts_entry"]
 
-    # Timeout 2 giờ
+    # Timeout 8 giờ
     if elapsed >= TIMEOUT_SECONDS:
         result = {
             "type":       "TIMEOUT",
@@ -230,7 +248,7 @@ def check_ema_signal(symbol: str, df_h1: pd.DataFrame, df_m15: pd.DataFrame,
     # Đang có lệnh → không tìm lệnh mới
     if t["status"] == "IN_TRADE":
         elapsed = round((time.time() - t["ts_entry"]) / 3600, 1)
-        print(f"    🔒 [B] {symbol}: IN_TRADE {t['direction']} entry={t['entry']} ({elapsed}h / 2h)")
+        print(f"    🔒 [B] {symbol}: IN_TRADE {t['direction']} entry={t['entry']} ({elapsed}h / 8h)")
         return None
 
     # Cooldown
