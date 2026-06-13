@@ -177,6 +177,162 @@ def cmd_status(update, context):
         state["symbols_d"], state["symbols_sr"]
     ))
 
+
+
+# ── CL A commands ────────────────────────────────────────────
+def cmd_aa(update, context):
+    if not context.args:
+        update.message.reply_text("❌ Dùng: /aa BTCUSDT")
+        return
+    from state import add_symbol_a
+    symbol = context.args[0].upper()
+    if not symbol.endswith("USDT"): symbol += "USDT"
+    if add_symbol_a(symbol):
+        update.message.reply_text(f"✅ Đã thêm {symbol} vào CL A")
+    else:
+        update.message.reply_text(f"⚠️ {symbol} đã có trong CL A")
+
+def cmd_ra(update, context):
+    if not context.args:
+        update.message.reply_text("❌ Dùng: /ra BTCUSDT")
+        return
+    from state import remove_symbol_a
+    symbol = context.args[0].upper()
+    if not symbol.endswith("USDT"): symbol += "USDT"
+    if remove_symbol_a(symbol):
+        update.message.reply_text(f"🗑 Đã xóa {symbol} khỏi CL A")
+    else:
+        update.message.reply_text(f"⚠️ {symbol} không có trong CL A")
+
+def cmd_ab(update, context):
+    if not context.args:
+        update.message.reply_text("❌ Dùng: /ab BTCUSDT")
+        return
+    from state import add_symbol_b
+    symbol = context.args[0].upper()
+    if not symbol.endswith("USDT"): symbol += "USDT"
+    if add_symbol_b(symbol):
+        update.message.reply_text(f"✅ Đã thêm {symbol} vào CL B")
+    else:
+        update.message.reply_text(f"⚠️ {symbol} đã có trong CL B")
+
+def cmd_rb(update, context):
+    if not context.args:
+        update.message.reply_text("❌ Dùng: /rb BTCUSDT")
+        return
+    from state import remove_symbol_b
+    symbol = context.args[0].upper()
+    if not symbol.endswith("USDT"): symbol += "USDT"
+    if remove_symbol_b(symbol):
+        update.message.reply_text(f"🗑 Đã xóa {symbol} khỏi CL B")
+    else:
+        update.message.reply_text(f"⚠️ {symbol} không có trong CL B")
+
+def cmd_ad(update, context):
+    if not context.args:
+        update.message.reply_text("❌ Dùng: /ad BTCUSDT")
+        return
+    from state import add_symbol_d
+    symbol = context.args[0].upper()
+    if not symbol.endswith("USDT"): symbol += "USDT"
+    if add_symbol_d(symbol):
+        update.message.reply_text(f"✅ Đã thêm {symbol} vào CL D")
+    else:
+        update.message.reply_text(f"⚠️ {symbol} đã có trong CL D")
+
+def cmd_rd(update, context):
+    if not context.args:
+        update.message.reply_text("❌ Dùng: /rd BTCUSDT")
+        return
+    from state import remove_symbol_d
+    symbol = context.args[0].upper()
+    if not symbol.endswith("USDT"): symbol += "USDT"
+    if remove_symbol_d(symbol):
+        update.message.reply_text(f"🗑 Đã xóa {symbol} khỏi CL D")
+    else:
+        update.message.reply_text(f"⚠️ {symbol} không có trong CL D")
+
+def cmd_asr(update, context):
+    if not context.args:
+        update.message.reply_text("❌ Dùng: /asr BTCUSDT")
+        return
+    from state import add_symbol_sr
+    symbol = context.args[0].upper()
+    if not symbol.endswith("USDT"): symbol += "USDT"
+    if add_symbol_sr(symbol):
+        update.message.reply_text(f"✅ Đã thêm {symbol} vào CL SR")
+    else:
+        update.message.reply_text(f"⚠️ {symbol} đã có trong CL SR")
+
+def cmd_rsr(update, context):
+    if not context.args:
+        update.message.reply_text("❌ Dùng: /rsr BTCUSDT")
+        return
+    from state import remove_symbol_sr
+    symbol = context.args[0].upper()
+    if not symbol.endswith("USDT"): symbol += "USDT"
+    if remove_symbol_sr(symbol):
+        update.message.reply_text(f"🗑 Đã xóa {symbol} khỏi CL SR")
+    else:
+        update.message.reply_text(f"⚠️ {symbol} không có trong CL SR")
+
+def cmd_strategy_d(update, context):
+    new = toggle_strategy("ichistoch")
+    icon = "✅ BẬT" if new else "❌ TẮT"
+    update.message.reply_text(f"🌊 CL D — IchiStoch\nTrạng thái: {icon}")
+
+def cmd_strategy_sr(update, context):
+    new = toggle_strategy("sr")
+    icon = "✅ BẬT" if new else "❌ TẮT"
+    update.message.reply_text(f"📊 CL SR — Hỗ trợ Kháng cự\nTrạng thái: {icon}")
+
+def cmd_reset_b(update, context):
+    from ema_strategy import _trades, _save_trades, get_trade_state
+    symbols = context.args if context.args else list(state["symbols_b"])
+    reset_list = []
+    for s in symbols:
+        sym = s.upper()
+        if not sym.endswith("USDT"): sym += "USDT"
+        t = get_trade_state(sym)
+        if t["status"] == "IN_TRADE":
+            t["status"] = "IDLE"
+            t["direction"] = None
+            t["entry"] = None
+            t["sl"] = None
+            t["tp"] = None
+            t["ts_entry"] = None
+            t["ts_cooldown"] = None
+            reset_list.append(sym)
+    _save_trades(_trades)
+    if reset_list:
+        update.message.reply_text(f"🔓 Đã reset CL B:\n" + "\n".join(f"  • {s}" for s in reset_list))
+    else:
+        update.message.reply_text("ℹ️ Không có lệnh nào đang IN_TRADE")
+
+def cmd_stats(update, context):
+    from trade_tracker import get_stats
+    update.message.reply_text(get_stats())
+
+def cmd_reset_tracker(update, context):
+    from trade_tracker import reset_history
+    reset_history()
+    update.message.reply_text("🗑 Đã xóa lịch sử thống kê.")
+
+def cmd_sr_params(update, context):
+    p = state.get("sr_params", {})
+    msg = "📊 Params CL Hỗ trợ Kháng cự:\n━━━━━━━━━━━━━━━━━━━━\n"
+    labels = {
+        "swing_length": "Swing Length", "box_width": "Zone Width",
+        "stoch_k": "Stoch K", "stoch_sm": "Stoch Smooth", "stoch_d": "Stoch D",
+        "stoch_ob": "Overbought", "stoch_os": "Oversold",
+        "vol_ma": "Volume MA", "vol_mult": "Volume Mult",
+        "wait_bars": "Wait Bars", "ma_len": "MA Length", "cooldown_min": "Cooldown (phút)",
+    }
+    for k, lbl in labels.items():
+        msg += f"  {lbl}: {p.get(k, '?')}\n"
+    msg += "━━━━━━━━━━━━━━━━━━━━\n/sr_set [param] [value]"
+    update.message.reply_text(msg)
+
 # ════════════════════════════════════════════════════════════
 #  CHIẾN LƯỢC C — Commands
 # ════════════════════════════════════════════════════════════
