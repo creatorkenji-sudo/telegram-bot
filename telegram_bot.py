@@ -168,6 +168,15 @@ def cmd_strategies(update, context):
     )
     update.message.reply_text(msg)
 
+
+
+def cmd_status(update, context):
+    update.message.reply_text(format_status(
+        state["symbols_a"], state["symbols_b"], state["strategies"],
+        state["symbols_c"], state.get("confirms_c", []),
+        state["symbols_d"], state["symbols_sr"]
+    ))
+
 # ════════════════════════════════════════════════════════════
 #  CHIẾN LƯỢC C — Commands
 # ════════════════════════════════════════════════════════════
