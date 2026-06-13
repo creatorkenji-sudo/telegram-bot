@@ -15,7 +15,7 @@ from state import (
     toggle_strategy, strategy_status,
 )
 from config import TOKEN
-from formatter import format_startup, format_status
+from formatter import format_startup, format_status, format_menu
 
 
 def _fmt_list(symbols: list) -> str:
