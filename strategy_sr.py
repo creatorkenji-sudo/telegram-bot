@@ -1,48 +1,42 @@
 # ============================================================
-#  strategy_sr.py — Chiến lược Hỗ trợ Kháng cự
+#  strategy_sr.py — Chiến lược Hỗ trợ Kháng cự (ZoneCandle)
 #
-#  Logic từ ZoneCandle_v1:
-#  ┌─────────────────────────────────────────────────────────┐
-#  │  1. Xác định vùng Supply/Demand (Pivot High/Low + ATR) │
-#  │  2. Phát hiện mẫu nến đảo chiều trong vùng             │
-#  │     - Bull Engulfing, Three Outside Up                  │
-#  │     - Bear Engulfing, Three Outside Down                │
-#  │  3. Xác nhận bằng Stoch + Volume + giá tăng/giảm       │
-#  │                                                         │
-#  │  LONG  = Demand active + bull candle + vol + stoch↑    │
-#  │  SHORT = Supply active + bear candle + vol + stoch↓    │
-#  └─────────────────────────────────────────────────────────┘
+#  Signal 1: LONG/SHORT Zone — giá chạm Demand/Supply
+#  Signal 2: BOS Pullback    — phá kháng cự + pullback MA20
+#  Signal 3: BOS Break       — thông báo khi phá vùng
 # ============================================================
 import time
 import numpy as np
 import pandas as pd
 
-# ── Cooldown state ────────────────────────────────────────────
-_last_signal: dict = {}   # symbol -> {direction, ts}
-_COOLDOWN = 30 * 60       # 30 phút mặc định
+# ── Cooldown ──────────────────────────────────────────────────
+_last_signal: dict = {}
 
-# ── Default params (có thể chỉnh qua Telegram) ───────────────
+# ── Default params ────────────────────────────────────────────
 DEFAULT_PARAMS = {
-    "swing_length": 10,      # Pivot lookback
-    "box_width":    2.5,     # ATR multiplier cho zone width
-    "stoch_k":      14,      # Stoch K period
-    "stoch_sm":     3,       # Stoch smooth
-    "stoch_d":      3,       # Stoch D period
-    "stoch_ob":     80,      # Overbought
-    "stoch_os":     20,      # Oversold
-    "vol_ma":       20,      # Volume MA period
-    "vol_mult":     1.2,     # Volume multiplier
-    "wait_bars":    3,       # Bars chờ sau khi vào vùng
-    "ma_len":       20,      # EMA length
-    "cooldown_min": 30,      # Cooldown giữa 2 lệnh (phút)
+    "swing_length": 10,
+    "box_width":    2.5,
+    "stoch_k":      14,
+    "stoch_sm":     3,
+    "stoch_d":      3,
+    "stoch_ob":     70,
+    "stoch_os":     30,
+    "vol_ma":       20,
+    "vol_mult":     1.2,
+    "wait_bars":    3,
+    "ma_len":       20,
+    "ema200_len":   200,
+    "ma_buf_pct":   0.3,
+    "bos_wait":     20,
+    "cooldown_min": 30,
 }
 
-# State riêng cho từng symbol
-_zone_state: dict = {}  # symbol -> {demand_active, supply_active, demand_bars, supply_bars}
+# ── Zone state per symbol ─────────────────────────────────────
+_zone_state: dict = {}
+_bos_state:  dict = {}
 
 
 def get_params(state: dict) -> dict:
-    """Lấy params từ state bot, fallback về default."""
     return state.get("sr_params", DEFAULT_PARAMS.copy())
 
 
@@ -57,25 +51,19 @@ def get_zone_state(symbol: str) -> dict:
     return _zone_state[symbol]
 
 
+def get_bos_state(symbol: str) -> dict:
+    if symbol not in _bos_state:
+        _bos_state[symbol] = {
+            "bos_up":     False,
+            "ma_touched": False,
+            "bos_bars":   0,
+        }
+    return _bos_state[symbol]
+
+
 # ════════════════════════════════════════════════════════════
 #  INDICATORS
 # ════════════════════════════════════════════════════════════
-def _pivot_high(df: pd.DataFrame, length: int):
-    highs = df["high"]
-    ph = []
-    for i in range(length, len(df) - length):
-        if highs.iloc[i] == highs.iloc[i-length:i+length+1].max():
-            ph.append((i, highs.iloc[i]))
-    return ph
-
-def _pivot_low(df: pd.DataFrame, length: int):
-    lows = df["low"]
-    pl = []
-    for i in range(length, len(df) - length):
-        if lows.iloc[i] == lows.iloc[i-length:i+length+1].min():
-            pl.append((i, lows.iloc[i]))
-    return pl
-
 def _atr(df: pd.DataFrame, period: int = 50) -> float:
     high, low, close = df["high"], df["low"], df["close"]
     tr = pd.concat([
@@ -83,7 +71,12 @@ def _atr(df: pd.DataFrame, period: int = 50) -> float:
         (high - close.shift()).abs(),
         (low  - close.shift()).abs()
     ], axis=1).max(axis=1)
-    return tr.rolling(period).mean().iloc[-1]
+    return float(tr.rolling(period).mean().iloc[-1])
+
+
+def _ema(series: pd.Series, period: int) -> pd.Series:
+    return series.ewm(span=period, adjust=False).mean()
+
 
 def _stoch(df: pd.DataFrame, k: int, sm: int, d: int):
     lo = df["low"].rolling(k).min()
@@ -93,129 +86,201 @@ def _stoch(df: pd.DataFrame, k: int, sm: int, d: int):
     d_line = k_line.rolling(d).mean()
     return k_line, d_line
 
-def _ema(series: pd.Series, period: int) -> pd.Series:
-    return series.ewm(span=period, adjust=False).mean()
+
+def _pivot_high(df: pd.DataFrame, length: int):
+    highs = df["high"]
+    ph = []
+    for i in range(length, len(df) - length):
+        if highs.iloc[i] == highs.iloc[i-length:i+length+1].max():
+            ph.append(highs.iloc[i])
+    return ph
+
+
+def _pivot_low(df: pd.DataFrame, length: int):
+    lows = df["low"]
+    pl = []
+    for i in range(length, len(df) - length):
+        if lows.iloc[i] == lows.iloc[i-length:i+length+1].min():
+            pl.append(lows.iloc[i])
+    return pl
 
 
 # ════════════════════════════════════════════════════════════
 #  ZONE DETECTION
 # ════════════════════════════════════════════════════════════
 def _get_zones(df: pd.DataFrame, params: dict):
-    """
-    Trả về list các vùng Supply và Demand.
-    Mỗi zone: {'type': 'supply'/'demand', 'top': float, 'bot': float}
-    """
     swing  = params["swing_length"]
     bw     = params["box_width"]
     atr    = _atr(df)
     buf    = atr * (bw / 10)
 
-    ph_list = _pivot_high(df, swing)
-    pl_list = _pivot_low(df,  swing)
+    ph_list = _pivot_high(df, swing)[-5:]
+    pl_list = _pivot_low(df,  swing)[-5:]
 
     zones = []
-
-    for _, val in ph_list[-5:]:   # 5 pivot gần nhất
-        top = val
-        bot = val - buf
-        zones.append({"type": "supply", "top": top, "bot": bot, "mid": (top+bot)/2})
-
-    for _, val in pl_list[-5:]:
-        bot = val
-        top = val + buf
-        zones.append({"type": "demand", "top": top, "bot": bot, "mid": (top+bot)/2})
-
-    return zones
+    for val in ph_list:
+        zones.append({"type": "supply", "top": val, "bot": val - buf, "mid": val - buf/2})
+    for val in pl_list:
+        zones.append({"type": "demand", "top": val + buf, "bot": val, "mid": val + buf/2})
+    return zones, atr
 
 
-def _price_in_zone(df: pd.DataFrame, zones: list, zone_type: str) -> bool:
+def _price_in_zone(df: pd.DataFrame, zones: list, zone_type: str) -> list:
+    """Trả về list các vùng mà giá hiện tại đang chạm"""
     high = df["high"].iloc[-1]
     low  = df["low"].iloc[-1]
+    matched = []
     for z in zones:
         if z["type"] != zone_type:
             continue
         if high >= z["bot"] and low <= z["top"]:
-            return True
-    return False
+            matched.append(z)
+    return matched
+
+
+def _nearest_supply_above(price: float, zones: list):
+    candidates = [z for z in zones if z["type"] == "supply" and z["bot"] > price]
+    return min(candidates, key=lambda z: z["bot"]) if candidates else None
 
 
 # ════════════════════════════════════════════════════════════
 #  CANDLE PATTERNS
 # ════════════════════════════════════════════════════════════
-def _bull_engulf(df: pd.DataFrame) -> bool:
+def _detect_pattern(df: pd.DataFrame) -> str:
     c, o = df["close"], df["open"]
-    return (c.iloc[-1] > o.iloc[-1] and
-            c.iloc[-2] < o.iloc[-2] and
-            c.iloc[-1] > o.iloc[-2] and
-            o.iloc[-1] < c.iloc[-2])
-
-def _three_outside_up(df: pd.DataFrame) -> bool:
-    c, o = df["close"], df["open"]
-    c1 = c.iloc[-3] < o.iloc[-3]                          # nến đỏ
-    c2 = c.iloc[-2] > o.iloc[-2]                          # nến xanh nhỏ
-    c3 = (c.iloc[-1] > o.iloc[-1] and
-          o.iloc[-1] <= o.iloc[-3] and
-          c.iloc[-1] >= c.iloc[-2])                        # xanh lớn nuốt cả 2
-    return c1 and c2 and c3
-
-def _bear_engulf(df: pd.DataFrame) -> bool:
-    c, o = df["close"], df["open"]
-    return (c.iloc[-1] < o.iloc[-1] and
-            c.iloc[-2] > o.iloc[-2] and
-            c.iloc[-1] < o.iloc[-2] and
-            o.iloc[-1] > c.iloc[-2])
-
-def _three_outside_down(df: pd.DataFrame) -> bool:
-    c, o = df["close"], df["open"]
-    c1 = c.iloc[-3] > o.iloc[-3]
-    c2 = c.iloc[-2] < o.iloc[-2]
-    c3 = (c.iloc[-1] < o.iloc[-1] and
-          o.iloc[-1] >= o.iloc[-3] and
-          c.iloc[-1] <= c.iloc[-2])
-    return c1 and c2 and c3
+    # Bull Engulfing
+    if (c.iloc[-1] > o.iloc[-1] and c.iloc[-2] < o.iloc[-2] and
+            c.iloc[-1] > o.iloc[-2] and o.iloc[-1] < c.iloc[-2]):
+        return "Bull Engulfing"
+    # Three Outside Up
+    c1 = c.iloc[-3] < o.iloc[-3]
+    c2 = c.iloc[-2] > o.iloc[-2]
+    c3 = c.iloc[-1] > o.iloc[-1] and o.iloc[-1] <= o.iloc[-3] and c.iloc[-1] >= c.iloc[-2]
+    if c1 and c2 and c3:
+        return "3LS↑"
+    # Bear Engulfing
+    if (c.iloc[-1] < o.iloc[-1] and c.iloc[-2] > o.iloc[-2] and
+            c.iloc[-1] < o.iloc[-2] and o.iloc[-1] > c.iloc[-2]):
+        return "Bear Engulfing"
+    # Three Outside Down
+    d1 = c.iloc[-3] > o.iloc[-3]
+    d2 = c.iloc[-2] < o.iloc[-2]
+    d3 = c.iloc[-1] < o.iloc[-1] and o.iloc[-1] >= o.iloc[-3] and c.iloc[-1] <= c.iloc[-2]
+    if d1 and d2 and d3:
+        return "3LS↓"
+    return ""
 
 
 # ════════════════════════════════════════════════════════════
 #  MAIN CHECK
 # ════════════════════════════════════════════════════════════
-def check_strategy_sr(symbol: str, df: pd.DataFrame, state: dict):
+def check_strategy_sr(symbol: str, df: pd.DataFrame, state: dict) -> list:
     """
-    Trả về dict signal hoặc None.
-    df: DataFrame 15m
+    Trả về list các signal dict (có thể nhiều signal cùng lúc).
+    Mỗi signal: {type, sub_type, price, ...}
     """
-    params = get_params(state)
-    zs     = get_zone_state(symbol)
-    wait   = params["wait_bars"]
-    cd_min = params["cooldown_min"]
+    params  = get_params(state)
+    zs      = get_zone_state(symbol)
+    bs      = get_bos_state(symbol)
+    cd_min  = params["cooldown_min"]
+    wait    = params["wait_bars"]
+    bos_wait = params["bos_wait"]
+    ma_buf  = params["ma_buf_pct"] / 100
 
-    # Cooldown check
-    if symbol in _last_signal:
-        elapsed = time.time() - _last_signal[symbol]["ts"]
-        if elapsed < cd_min * 60:
-            mins_left = int((cd_min * 60 - elapsed) / 60)
-            print(f"    ⏳ [SR] {symbol}: cooldown còn {mins_left} phút")
-            return None
+    price   = float(df["close"].iloc[-1])
+    price_1 = float(df["close"].iloc[-2])
 
-    # Tính indicators
-    price  = df["close"].iloc[-1]
+    # Indicators
+    ma      = _ema(df["close"], params["ma_len"])
+    ema200  = _ema(df["close"], params["ema200_len"])
+    ma_val  = float(ma.iloc[-1])
+    ma_val1 = float(ma.iloc[-2])
+    ma_val2 = float(ma.iloc[-3])
+
     k_line, d_line = _stoch(df, params["stoch_k"], params["stoch_sm"], params["stoch_d"])
-    k_cur, k_prv   = k_line.iloc[-1], k_line.iloc[-2]
-    d_cur, d_prv   = d_line.iloc[-1], d_line.iloc[-2]
-    vol_ma  = df["volume"].rolling(params["vol_ma"]).mean().iloc[-1]
-    vol_ok  = df["volume"].iloc[-1] > vol_ma * params["vol_mult"]
-    stoch_long  = k_cur > d_cur and k_prv <= d_prv and k_cur < params["stoch_ob"]
-    stoch_short = k_cur < d_cur and k_prv >= d_prv and k_cur > params["stoch_os"]
-    bull_candle  = df["close"].iloc[-1] > df["open"].iloc[-1]
-    bear_candle  = df["close"].iloc[-1] < df["open"].iloc[-1]
-    price_rising  = df["close"].iloc[-1] > df["close"].iloc[-2]
-    price_falling = df["close"].iloc[-1] < df["close"].iloc[-2]
+    k_cur  = float(k_line.iloc[-1])
+    k_prv  = float(k_line.iloc[-2])
+    d_cur  = float(d_line.iloc[-1])
+    d_prv  = float(d_line.iloc[-2])
 
-    # Zones
-    zones      = _get_zones(df, params)
-    in_demand  = _price_in_zone(df, zones, "demand")
-    in_supply  = _price_in_zone(df, zones, "supply")
+    vol_ma     = float(df["volume"].rolling(params["vol_ma"]).mean().iloc[-1])
+    vol_strong = float(df["volume"].iloc[-1]) > vol_ma * params["vol_mult"]
+    vol_pct    = round(float(df["volume"].iloc[-1]) / vol_ma * 100)
 
-    # Cập nhật zone active state
+    bull_candle = price > float(df["open"].iloc[-1])
+    bear_candle = price < float(df["open"].iloc[-1])
+    stoch_long  = k_cur > d_cur and k_prv <= d_cur and k_cur < params["stoch_ob"]
+    stoch_short = k_cur < d_cur and k_prv >= d_cur and k_cur > params["stoch_os"]
+
+    zones, atr  = _get_zones(df, params)
+    dem_zones   = _price_in_zone(df, zones, "demand")
+    sup_zones   = _price_in_zone(df, zones, "supply")
+    in_demand   = len(dem_zones) > 0
+    in_supply   = len(sup_zones) > 0
+
+    signals = []
+
+    # ── BOS BREAK detection ────────────────────────────────────
+    # Supply bị phá (close[1] >= top supply)
+    for z in [z for z in zones if z["type"] == "supply"]:
+        if price_1 >= z["top"]:
+            # BOS Break Up
+            signals.append({
+                "type":     "BOS_BREAK",
+                "direction":"UP",
+                "price":    round(price, 4),
+                "zone_level": round(z["top"], 4),
+            })
+            # Kích hoạt BOS UP nếu MA đang tăng
+            if price_1 > ma_val and ma_val > ma_val1:
+                bs["bos_up"]     = True
+                bs["ma_touched"] = False
+                bs["bos_bars"]   = 0
+            break
+
+    # Demand bị phá (close[1] <= bot demand)
+    for z in [z for z in zones if z["type"] == "demand"]:
+        if price_1 <= z["bot"]:
+            signals.append({
+                "type":     "BOS_BREAK",
+                "direction":"DOWN",
+                "price":    round(price, 4),
+                "zone_level": round(z["bot"], 4),
+            })
+            break
+
+    # ── BOS PULLBACK tracking ──────────────────────────────────
+    if bs["bos_up"]:
+        bs["bos_bars"] += 1
+        # Chạm MA20 trong buffer
+        low_cur = float(df["low"].iloc[-1])
+        if low_cur <= ma_val and price >= ma_val - ma_val * ma_buf and ma_val > ma_val1:
+            bs["ma_touched"] = True
+        # Reset nếu MA dốc xuống 2 nến
+        if ma_val < ma_val2 and ma_val1 < ma_val2:
+            bs["bos_up"] = bs["ma_touched"] = False
+            bs["bos_bars"] = 0
+        # Timeout
+        if bs["bos_bars"] > bos_wait:
+            bs["bos_up"] = bs["ma_touched"] = False
+            bs["bos_bars"] = 0
+
+    # ── BOS LONG signal ────────────────────────────────────────
+    if bs["bos_up"] and bs["ma_touched"] and price > ma_val and price_1 <= ma_val and bull_candle:
+        cd_key = f"{symbol}_bos"
+        elapsed = time.time() - _last_signal.get(cd_key, {}).get("ts", 0)
+        if elapsed >= cd_min * 60:
+            signals.append({
+                "type":    "BOS_LONG",
+                "price":   round(price, 4),
+                "ma_val":  round(ma_val, 4),
+                "k_line":  round(k_cur, 1),
+            })
+            _last_signal[cd_key] = {"ts": time.time()}
+            bs["bos_up"] = bs["ma_touched"] = False
+            bs["bos_bars"] = 0
+
+    # ── Zone active update ─────────────────────────────────────
     if in_demand:
         zs["demand_active"] = True
         zs["demand_bars"]   = 0
@@ -234,29 +299,47 @@ def check_strategy_sr(symbol: str, df: pd.DataFrame, state: dict):
             zs["supply_active"] = False
             zs["supply_bars"]   = 0
 
-    # Mẫu nến
-    bull_pat = _bull_engulf(df) or _three_outside_up(df)
-    bear_pat = _bear_engulf(df) or _three_outside_down(df)
+    # ── Zone LONG signal ───────────────────────────────────────
+    if zs["demand_active"] and bull_candle and vol_strong and stoch_long and price > price_1:
+        cd_key = f"{symbol}_long"
+        elapsed = time.time() - _last_signal.get(cd_key, {}).get("ts", 0)
+        if elapsed >= cd_min * 60:
+            pattern = _detect_pattern(df)
+            zone    = dem_zones[0] if dem_zones else {}
+            signals.append({
+                "type":     "LONG",
+                "price":    round(price, 4),
+                "zone_top": round(zone.get("top", price), 4),
+                "zone_bot": round(zone.get("bot", price), 4),
+                "pattern":  pattern or "—",
+                "k_line":   round(k_cur, 1),
+                "d_line":   round(d_cur, 1),
+                "vol_pct":  vol_pct,
+            })
+            _last_signal[cd_key] = {"ts": time.time()}
 
-    # Signal
-    long_signal  = zs["demand_active"] and bull_candle and vol_ok and stoch_long and price_rising
-    short_signal = zs["supply_active"] and bear_candle and vol_ok and stoch_short and price_falling
+    # ── Zone SHORT signal ──────────────────────────────────────
+    if zs["supply_active"] and bear_candle and vol_strong and stoch_short and price < price_1:
+        cd_key = f"{symbol}_short"
+        elapsed = time.time() - _last_signal.get(cd_key, {}).get("ts", 0)
+        if elapsed >= cd_min * 60:
+            pattern = _detect_pattern(df)
+            zone    = sup_zones[0] if sup_zones else {}
+            signals.append({
+                "type":     "SHORT",
+                "price":    round(price, 4),
+                "zone_top": round(zone.get("top", price), 4),
+                "zone_bot": round(zone.get("bot", price), 4),
+                "pattern":  pattern or "—",
+                "k_line":   round(k_cur, 1),
+                "d_line":   round(d_cur, 1),
+                "vol_pct":  vol_pct,
+            })
+            _last_signal[cd_key] = {"ts": time.time()}
 
-    print(f"    — [SR] {symbol}: ${price:.4f} | demand={zs['demand_active']} supply={zs['supply_active']} | k={k_cur:.1f} vol={'✓' if vol_ok else '✗'}")
+    if signals:
+        print(f"  📊 [SR] {symbol}: {[s['type'] for s in signals]}")
+    else:
+        print(f"    — [SR] {symbol}: ${price:.4f} | dem={zs['demand_active']} sup={zs['supply_active']} bos={bs['bos_up']} k={k_cur:.1f}")
 
-    if long_signal or short_signal:
-        direction = "LONG" if long_signal else "SHORT"
-        pattern   = "Bull Engulfing" if _bull_engulf(df) else "Three Outside Up" if _three_outside_up(df) else "Bear Engulfing" if _bear_engulf(df) else "Three Outside Down" if _three_outside_down(df) else "—"
-        _last_signal[symbol] = {"direction": direction, "ts": time.time()}
-        return {
-            "type":    direction,
-            "price":   round(price, 4),
-            "k_line":  round(k_cur, 1),
-            "d_line":  round(d_cur, 1),
-            "vol_pct": round(df["volume"].iloc[-1] / vol_ma * 100, 0),
-            "pattern": pattern,
-            "in_demand": in_demand,
-            "in_supply": in_supply,
-        }
-
-    return None
+    return signals

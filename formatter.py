@@ -425,6 +425,74 @@ def format_menu() -> str:
         f"  /menu             — menu này\n"
     )
 
+
+
+# ════════════════════════════════════════════════════════════
+#  ZONE CANDLE — SR Formatter
+# ════════════════════════════════════════════════════════════
+def format_sr_long(symbol: str, sig: dict) -> str:
+    coin = symbol.replace("USDT", "")
+    pat  = f"\n🕯 Mẫu nến  : {sig['pattern']}" if sig.get("pattern") and sig["pattern"] != "—" else ""
+    return (
+        f"🟢📊══════════════════📊🟢\n"
+        f"🚀 LONG — {coin}/USDT · {sig.get('tf','15m')}\n"
+        f"🕐 {_now()}\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"💰 Giá      : {sig['price']:,.4f}\n"
+        f"📍 Demand   : {sig['zone_bot']:,.4f} – {sig['zone_top']:,.4f}\n"
+        f"{pat}\n"
+        f"⚡ Stoch    : {sig['k_line']} / {sig['d_line']}\n"
+        f"📊 Volume   : {sig['vol_pct']}% MA\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"📌 CL SR — Hỗ trợ Kháng cự\n"
+        f"⚠️ Không phải lời khuyên đầu tư!\n"
+        f"🟢📊══════════════════📊🟢"
+    )
+
+def format_sr_short(symbol: str, sig: dict) -> str:
+    coin = symbol.replace("USDT", "")
+    pat  = f"\n🕯 Mẫu nến  : {sig['pattern']}" if sig.get("pattern") and sig["pattern"] != "—" else ""
+    return (
+        f"🔴📊══════════════════📊🔴\n"
+        f"💥 SHORT — {coin}/USDT · {sig.get('tf','15m')}\n"
+        f"🕐 {_now()}\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"💰 Giá      : {sig['price']:,.4f}\n"
+        f"📍 Supply   : {sig['zone_bot']:,.4f} – {sig['zone_top']:,.4f}\n"
+        f"{pat}\n"
+        f"⚡ Stoch    : {sig['k_line']} / {sig['d_line']}\n"
+        f"📊 Volume   : {sig['vol_pct']}% MA\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"📌 CL SR — Hỗ trợ Kháng cự\n"
+        f"⚠️ Không phải lời khuyên đầu tư!\n"
+        f"🔴📊══════════════════📊🔴"
+    )
+
+def format_sr_bos_long(symbol: str, sig: dict) -> str:
+    coin = symbol.replace("USDT", "")
+    return (
+        f"🔵 BOS LONG — {coin}/USDT · {sig.get('tf','15m')}\n"
+        f"📈 Phá kháng cự → Pullback MA20 → Bật lên\n"
+        f"💰 Giá: {sig['price']:,.4f} · MA20: {sig['ma_val']:,.4f}\n"
+        f"⚡ Stoch %K: {sig['k_line']}\n"
+        f"🕐 {_now()}"
+    )
+
+def format_sr_bos_break(symbol: str, sig: dict) -> str:
+    coin = symbol.replace("USDT", "")
+    if sig["direction"] == "UP":
+        return (
+            f"🔷 B↑ {coin} phá kháng cự\n"
+            f"Giá: {sig['price']:,.4f} · Vùng: {sig['zone_level']:,.4f}\n"
+            f"🕐 {_now()}"
+        )
+    else:
+        return (
+            f"🟡 B↓ {coin} phá hỗ trợ\n"
+            f"Giá: {sig['price']:,.4f} · Vùng: {sig['zone_level']:,.4f}\n"
+            f"🕐 {_now()}"
+        )
+
 # Alias
 format_entry = format_ichimoku_entry
 format_setup = format_ichimoku_entry
