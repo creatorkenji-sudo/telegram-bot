@@ -170,11 +170,12 @@ def format_strategy_c(symbol: str, sig: dict) -> str:
 # ════════════════════════════════════════════════════════════
 #  CHUNG — startup / status / heartbeat
 # ════════════════════════════════════════════════════════════
-def format_startup(symbols_a, symbols_b, symbols_c=None, symbols_d=None) -> str:
-    ca = _fmt(symbols_a)
-    cb = _fmt(symbols_b)
-    cc = _fmt(symbols_c) if symbols_c is not None else "Trống"
-    cd = _fmt(symbols_d) if symbols_d is not None else "Trống"
+def format_startup(symbols_a, symbols_b, symbols_c=None, symbols_d=None, symbols_sr=None) -> str:
+    ca  = _fmt(symbols_a)
+    cb  = _fmt(symbols_b)
+    cc  = _fmt(symbols_c)  if symbols_c  is not None else "Trống"
+    cd  = _fmt(symbols_d)  if symbols_d  is not None else "Trống"
+    csr = _fmt(symbols_sr) if symbols_sr is not None else "Trống"
     return (
         f"✅  BOT CRYPTO ALERT BẬT\n"
         f"🕐 {_now()}\n"
@@ -183,28 +184,32 @@ def format_startup(symbols_a, symbols_b, symbols_c=None, symbols_d=None) -> str:
         f"📈 CL B (EMA+MACD)     : {cb}\n"
         f"⚡ CL C (Supertrend)   : {cc}\n"
         f"🌊 CL D (IchiStoch)    : {cd}\n"
+        f"📊 CL SR (H/T Kháng cự): {csr}\n"
         f"⚖️ R:R : 1:{RR_RATIO}  ·  SL {SL_PERCENT}%\n"
         f"━━━━━━━━━━━━━━━━━━━━\n"
         f"/aa /ra — CL A  ·  /ab /rb — CL B\n"
         f"/ac /rc — CL C  ·  /ad /rd — CL D\n"
-        f"/add /remove — cả 4\n"
-        f"/strategy_a /strategy_b /strategy_c /strategy_d\n"
-        f"/confirms /set_confirm /status"
+        f"/asr /rsr — CL SR\n"
+        f"/add /remove — cả 5\n"
+        f"/menu — xem tất cả lệnh"
     )
 
 
 def format_status(symbols_a, symbols_b, strategies=None,
-                  symbols_c=None, confirms_c=None, symbols_d=None) -> str:
-    ca = _fmt_list(symbols_a)
-    cb = _fmt_list(symbols_b)
-    cc = _fmt_list(symbols_c) if symbols_c else "  (Trống)"
-    cd = _fmt_list(symbols_d) if symbols_d else "  (Trống)"
+                  symbols_c=None, confirms_c=None, symbols_d=None,
+                  symbols_sr=None) -> str:
+    ca  = _fmt_list(symbols_a)
+    cb  = _fmt_list(symbols_b)
+    cc  = _fmt_list(symbols_c)  if symbols_c  else "  (Trống)"
+    cd  = _fmt_list(symbols_d)  if symbols_d  else "  (Trống)"
+    csr = _fmt_list(symbols_sr) if symbols_sr else "  (Trống)"
 
     if strategies:
-        sa = "✅ BẬT" if strategies.get("ichimoku")   else "❌ TẮT"
-        sb = "✅ BẬT" if strategies.get("ema")         else "❌ TẮT"
-        sc = "✅ BẬT" if strategies.get("supertrend")  else "❌ TẮT"
-        sd = "✅ BẬT" if strategies.get("ichistoch")   else "❌ TẮT"
+        sa  = "✅ BẬT" if strategies.get("ichimoku")  else "❌ TẮT"
+        sb  = "✅ BẬT" if strategies.get("ema")        else "❌ TẮT"
+        sc  = "✅ BẬT" if strategies.get("supertrend") else "❌ TẮT"
+        sd  = "✅ BẬT" if strategies.get("ichistoch")  else "❌ TẮT"
+        ssr = "✅ BẬT" if strategies.get("sr")         else "❌ TẮT"
         strat = (
             f"━━━━━━━━━━━━━━━━━━━━\n"
             f"⚙️  Chiến lược:\n"
@@ -212,6 +217,7 @@ def format_status(symbols_a, symbols_b, strategies=None,
             f"  📈 B — EMA+MACD    : {sb}\n"
             f"  ⚡ C — Supertrend  : {sc}\n"
             f"  🌊 D — IchiStoch   : {sd}\n"
+            f"  📊 SR— H/T Kháng cự: {ssr}\n"
         )
     else:
         strat = ""
@@ -232,6 +238,8 @@ def format_status(symbols_a, symbols_b, strategies=None,
         f"⚡ CL C (Supertrend):\n{cc}\n"
         f"━━━━━━━━━━━━━━━━━━━━\n"
         f"🌊 CL D (IchiStoch):\n{cd}\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"📊 CL SR (H/T Kháng cự):\n{csr}\n"
         f"{strat}"
         f"{conf_line}"
         f"━━━━━━━━━━━━━━━━━━━━\n"
@@ -240,15 +248,17 @@ def format_status(symbols_a, symbols_b, strategies=None,
 
 
 def format_heartbeat(symbols_a, symbols_b, strategies,
-                     symbols_c=None, symbols_d=None) -> str:
-    ca = _fmt(symbols_a)
-    cb = _fmt(symbols_b)
-    cc = _fmt(symbols_c) if symbols_c else "Trống"
-    cd = _fmt(symbols_d) if symbols_d else "Trống"
-    sa = "✅" if strategies.get("ichimoku")  else "❌"
-    sb = "✅" if strategies.get("ema")        else "❌"
-    sc = "✅" if strategies.get("supertrend") else "❌"
-    sd = "✅" if strategies.get("ichistoch")  else "❌"
+                     symbols_c=None, symbols_d=None, symbols_sr=None) -> str:
+    ca  = _fmt(symbols_a)
+    cb  = _fmt(symbols_b)
+    cc  = _fmt(symbols_c)  if symbols_c  else "Trống"
+    cd  = _fmt(symbols_d)  if symbols_d  else "Trống"
+    csr = _fmt(symbols_sr) if symbols_sr else "Trống"
+    sa  = "✅" if strategies.get("ichimoku")  else "❌"
+    sb  = "✅" if strategies.get("ema")        else "❌"
+    sc  = "✅" if strategies.get("supertrend") else "❌"
+    sd  = "✅" if strategies.get("ichistoch")  else "❌"
+    ssr = "✅" if strategies.get("sr")         else "❌"
     return (
         f"💚  BOT ĐANG HOẠT ĐỘNG\n"
         f"🕐 {_now()}\n"
@@ -257,6 +267,7 @@ def format_heartbeat(symbols_a, symbols_b, strategies,
         f"📈 CL B {sb}: {cb}\n"
         f"⚡ CL C {sc}: {cc}\n"
         f"🌊 CL D {sd}: {cd}\n"
+        f"📊 SR   {ssr}: {csr}\n"
         f"━━━━━━━━━━━━━━━━━━━━\n"
         f"✅ Hoạt động bình thường"
     )
@@ -383,6 +394,57 @@ def format_strategy_sr(symbol: str, sig: dict) -> str:
         f"📌 Chiến lược Hỗ trợ Kháng cự\n"
         f"⚠️ Không phải lời khuyên đầu tư!\n"
         f"{bar}"
+    )
+
+
+
+def format_menu() -> str:
+    return (
+        f"📋 MENU LỆNH BOT\n"
+        f"🕐 {_now()}\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"📌 QUẢN LÝ COIN\n"
+        f"  /add [coin]    — thêm vào cả 5 CL\n"
+        f"  /remove [coin] — xóa khỏi cả 5 CL\n"
+        f"  /aa /ra [coin] — CL A thêm/xóa\n"
+        f"  /ab /rb [coin] — CL B thêm/xóa\n"
+        f"  /ac /rc [coin] — CL C thêm/xóa\n"
+        f"  /ad /rd [coin] — CL D thêm/xóa\n"
+        f"  /asr /rsr [coin]— CL SR thêm/xóa\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"⚙️  BẬT/TẮT CHIẾN LƯỢC\n"
+        f"  /strategy_a — CL A (Ichimoku)\n"
+        f"  /strategy_b — CL B (EMA+MACD)\n"
+        f"  /strategy_c — CL C (Supertrend)\n"
+        f"  /strategy_d — CL D (IchiStoch)\n"
+        f"  /strategy_sr— CL SR (H/T Kháng cự)\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"📊 CL B — EMA+MACD\n"
+        f"  /panel_b          — bảng điều khiển\n"
+        f"  /filter_b on/off  — bật/tắt bộ lọc\n"
+        f"  /minpass_b [n]    — số bộ lọc tối thiểu\n"
+        f"  /reset_b [coin]   — reset lệnh đang mở\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"⚡ CL C — Supertrend\n"
+        f"  /confirms         — xem xác nhận\n"
+        f"  /set_confirm      — đặt xác nhận\n"
+        f"  /add_confirm      — thêm xác nhận\n"
+        f"  /remove_confirm   — xóa xác nhận\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"📊 CL SR — Hỗ trợ Kháng cự\n"
+        f"  /sr_params        — xem params\n"
+        f"  /sr_set [k] [v]   — chỉnh param\n"
+        f"  /sr_reset         — reset mặc định\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"📈 THỐNG KÊ\n"
+        f"  /stats            — thống kê 7 ngày\n"
+        f"  /reset_tracker    — xóa lịch sử\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"🔧 TIỆN ÍCH\n"
+        f"  /status           — trạng thái bot\n"
+        f"  /list             — danh sách coin\n"
+        f"  /strategies       — trạng thái CL\n"
+        f"  /menu             — menu này\n"
     )
 
 # Alias

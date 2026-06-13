@@ -70,7 +70,7 @@ def cmd_list(update, context):
 def cmd_status(update, context):
     update.message.reply_text(format_status(
         state["symbols_a"], state["symbols_b"], state["strategies"],
-        state["symbols_c"], state["confirms_c"], state["symbols_d"]
+        state["symbols_c"], state["confirms_c"], state["symbols_d"], state["symbols_sr"]
     ))
 
 
@@ -386,6 +386,11 @@ def cmd_sr_reset(update, context):
     update.message.reply_text("🔄 Đã reset CL SR về params mặc định\n\nGõ /sr_params để xem")
 
 
+
+def cmd_menu(update, context):
+    update.message.reply_text(format_menu())
+
+
 def run_telegram():
     updater = Updater(TOKEN, use_context=True)
     updater.bot.delete_webhook(drop_pending_updates=True)
@@ -662,6 +667,7 @@ def run_telegram():
     dp.add_handler(CommandHandler("sr_params",      cmd_sr_params))
     dp.add_handler(CommandHandler("sr_set",         cmd_sr_set))
     dp.add_handler(CommandHandler("sr_reset",       cmd_sr_reset))
+    dp.add_handler(CommandHandler("menu",            cmd_menu))
     dp.add_handler(CommandHandler("ad",             cmd_ad))
     dp.add_handler(CommandHandler("rd",             cmd_rd))
 

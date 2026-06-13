@@ -186,7 +186,7 @@ def run_strategy_sr(symbol: str):
 
 # ── Main loop ────────────────────────────────────────────────
 def main():
-    send(format_startup(state["symbols_a"], state["symbols_b"], state["symbols_c"], state["symbols_d"]))
+    send(format_startup(state["symbols_a"], state["symbols_b"], state["symbols_c"], state["symbols_d"], state["symbols_sr"]))
     run_telegram()
 
     print(f"🚀 Bot V4 chạy | interval={CHECK_INTERVAL}s")
@@ -243,7 +243,7 @@ def main():
 
         # Heartbeat mỗi 1 giờ
         if time.time() - last_heartbeat >= 3600:
-            send(format_heartbeat(state["symbols_a"], state["symbols_b"], state["strategies"], state["symbols_c"], state["symbols_d"]))
+            send(format_heartbeat(state["symbols_a"], state["symbols_b"], state["strategies"], state["symbols_c"], state["symbols_d"], state["symbols_sr"]))
             print("  💚 Heartbeat OK")
             last_heartbeat = time.time()
 
