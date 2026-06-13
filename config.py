@@ -12,7 +12,7 @@ BASE_URL = "https://api.bybit.com"
 LIMIT    = 200
 
 # ── Coin mặc định khi khởi động ──────────────────────────────
-DEFAULT_SYMBOLS = ["ETHUSDT","BTCUSDT","HYPEUSDT", "NEARUSDT", "BEATUSDT", "ASTERUSDT", "MAGMAUSDT", "EDGEUSDT", "ONDOUSDT", "AAVEUSDT", "RECALLUSDT", "VVVUSDT", "BSBUSDT", "CGPTUSDT", "LITUSDT", "WLDUSDT"]
+DEFAULT_SYMBOLS = ["ETHUSDT","BTCUSDT"]
 
 
 # ── Khung thời gian ──────────────────────────────────────────
