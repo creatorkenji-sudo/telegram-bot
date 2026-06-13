@@ -57,23 +57,19 @@ def cmd_remove(update, context):
         update.message.reply_text(f"⚠️ {symbol} không có trong danh sách nào")
 
 def cmd_list(update, context):
-    from datetime import datetime, timezone, timedelta
-    now = datetime.now(timezone(timedelta(hours=7))).strftime("%d/%m %H:%M (UTC+7)")
     def fl(syms): return ", ".join(s.replace("USDT","") for s in syms) if syms else "Trống"
-    msg  = f"📋 DANH SÁCH COIN
-🕐 {now}
-━━━━━━━━━━━━━━━━━━━━
-"
-    msg += f"☁️  CL A ({len(state['symbols_a'])}): {fl(state['symbols_a'])}
-"
-    msg += f"📈 CL B ({len(state['symbols_b'])}): {fl(state['symbols_b'])}
-"
-    msg += f"⚡ CL C ({len(state['symbols_c'])}): {fl(state['symbols_c'])}
-"
-    msg += f"🌊 CL D ({len(state['symbols_d'])}): {fl(state['symbols_d'])}
-"
-    msg += f"📊 CL SR ({len(state['symbols_sr'])}): {fl(state['symbols_sr'])}
-"
+    na  = len(state["symbols_a"])
+    nb  = len(state["symbols_b"])
+    nc  = len(state["symbols_c"])
+    nd  = len(state["symbols_d"])
+    nsr = len(state["symbols_sr"])
+    msg  = "📋 DANH SÁCH COIN\n"
+    msg += "━━━━━━━━━━━━━━━━━━━━\n"
+    msg += f"☁️  CL A ({na}): {fl(state['symbols_a'])}\n"
+    msg += f"📈 CL B ({nb}): {fl(state['symbols_b'])}\n"
+    msg += f"⚡ CL C ({nc}): {fl(state['symbols_c'])}\n"
+    msg += f"🌊 CL D ({nd}): {fl(state['symbols_d'])}\n"
+    msg += f"📊 CL SR ({nsr}): {fl(state['symbols_sr'])}\n"
     update.message.reply_text(msg)
 
 def cmd_sr_set(update, context):
