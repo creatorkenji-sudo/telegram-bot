@@ -186,7 +186,7 @@ def run_strategy_sr(symbol: str):
 
 # ── Main loop ────────────────────────────────────────────────
 def main():
-    send(format_startup(state["symbols_a"], state["symbols_b"], state["symbols_c"], state["symbols_d"], state["symbols_sr"]))
+    send(format_startup(state["symbols_a"], state["symbols_b"], state["symbols_c"], state["symbols_d"], state["symbols_sr"], state["strategies"]))
     run_telegram()
 
     print(f"🚀 Bot V4 chạy | interval={CHECK_INTERVAL}s")

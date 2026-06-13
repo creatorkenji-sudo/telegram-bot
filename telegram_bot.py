@@ -57,298 +57,23 @@ def cmd_remove(update, context):
         update.message.reply_text(f"⚠️ {symbol} không có trong danh sách nào")
 
 def cmd_list(update, context):
-    update.message.reply_text(
-        f"📋 DANH SÁCH COIN\n"
-        f"━━━━━━━━━━━━━━━━━━━━\n"
-        f"☁️  CL A (Ichimoku):\n"
-        + "\n".join(f"  • {s}" for s in state["symbols_a"] or ["(Trống)"]) +
-        f"\n━━━━━━━━━━━━━━━━━━━━\n"
-        f"📈 CL B (EMA+MACD):\n"
-        + "\n".join(f"  • {s}" for s in state["symbols_b"] or ["(Trống)"])
-    )
-
-def cmd_status(update, context):
-    update.message.reply_text(format_status(
-        state["symbols_a"], state["symbols_b"], state["strategies"],
-        state["symbols_c"], state["confirms_c"], state["symbols_d"], state["symbols_sr"]
-    ))
-
-
-# ── Lệnh riêng Chiến lược A ──────────────────────────────────
-def cmd_aa(update, context):
-    """Thêm coin vào Chiến lược A."""
-    if not context.args:
-        update.message.reply_text("❌ Dùng: /aa BTCUSDT")
-        return
-    symbol = _clean(context.args[0])
-    if add_symbol_a(symbol):
-        update.message.reply_text(
-            f"✅ Đã thêm {symbol} vào CL A\n"
-            f"☁️  CL A: {_fmt_list(state['symbols_a'])}"
-        )
-    else:
-        update.message.reply_text(f"⚠️ {symbol} đã có trong CL A rồi")
-
-def cmd_ra(update, context):
-    """Xóa coin khỏi Chiến lược A."""
-    if not context.args:
-        update.message.reply_text("❌ Dùng: /ra BTCUSDT")
-        return
-    symbol = _clean(context.args[0])
-    if remove_symbol_a(symbol):
-        update.message.reply_text(
-            f"🗑 Đã xóa {symbol} khỏi CL A\n"
-            f"☁️  CL A: {_fmt_list(state['symbols_a'])}"
-        )
-    else:
-        update.message.reply_text(f"⚠️ {symbol} không có trong CL A")
-
-
-# ── Lệnh riêng Chiến lược B ──────────────────────────────────
-def cmd_ab(update, context):
-    """Thêm coin vào Chiến lược B."""
-    if not context.args:
-        update.message.reply_text("❌ Dùng: /ab HYPEUSDT")
-        return
-    symbol = _clean(context.args[0])
-    if add_symbol_b(symbol):
-        update.message.reply_text(
-            f"✅ Đã thêm {symbol} vào CL B\n"
-            f"📈 CL B: {_fmt_list(state['symbols_b'])}"
-        )
-    else:
-        update.message.reply_text(f"⚠️ {symbol} đã có trong CL B rồi")
-
-def cmd_rb(update, context):
-    """Xóa coin khỏi Chiến lược B."""
-    if not context.args:
-        update.message.reply_text("❌ Dùng: /rb HYPEUSDT")
-        return
-    symbol = _clean(context.args[0])
-    if remove_symbol_b(symbol):
-        update.message.reply_text(
-            f"🗑 Đã xóa {symbol} khỏi CL B\n"
-            f"📈 CL B: {_fmt_list(state['symbols_b'])}"
-        )
-    else:
-        update.message.reply_text(f"⚠️ {symbol} không có trong CL B")
-
-
-# ── Bật/tắt chiến lược ───────────────────────────────────────
-def cmd_strategy_a(update, context):
-    new = toggle_strategy("ichimoku")
-    icon = "✅ BẬT" if new else "❌ TẮT"
-    update.message.reply_text(
-        f"☁️  Chiến lược A — Ichimoku + StochRSI\n"
-        f"Trạng thái mới: {icon}\n\n"
-        f"{strategy_status()}"
-    )
-
-def cmd_strategy_b(update, context):
-    new = toggle_strategy("ema")
-    icon = "✅ BẬT" if new else "❌ TẮT"
-    update.message.reply_text(
-        f"📈 Chiến lược B — EMA Pullback + MACD\n"
-        f"Trạng thái mới: {icon}\n\n"
-        f"{strategy_status()}"
-    )
-
-def cmd_strategies(update, context):
-    update.message.reply_text(strategy_status())
-
-
-# ── Helper ────────────────────────────────────────────────────
-def _clean(symbol: str) -> str:
-    s = symbol.upper()
-    if not s.endswith("USDT"):
-        s += "USDT"
-    return s
-
-
-# ── Khởi động polling ─────────────────────────────────────────
-
-def cmd_panel_b(update, context):
-    """Hiện bảng điều khiển CL B."""
-    update.message.reply_text(
-        format_panel_b(state["strategies"], state["filters_b"], state["min_pass_b"])
-    )
-
-
-def cmd_filter_b(update, context):
-    """
-    /filter_b on ema_h1
-    /filter_b off macd
-    """
-    if len(context.args) < 2:
-        update.message.reply_text(
-            "❌ Dùng: /filter_b on ema_h1\n"
-            "hoặc : /filter_b off macd\n\n"
-            "Các bộ lọc: " + ", ".join(FILTER_KEYS)
-        )
-        return
-    action = context.args[0].lower()
-    key    = context.args[1].lower()
-    if key not in FILTER_KEYS:
-        update.message.reply_text(
-            f"⚠️ Không tìm thấy bộ lọc '{key}'\n"
-            f"Danh sách: {', '.join(FILTER_KEYS)}"
-        )
-        return
-    if action not in ("on", "off"):
-        update.message.reply_text("❌ Dùng: on hoặc off")
-        return
-    is_on = action == "on"
-    state["filters_b"][key] = is_on
-    # Đảm bảo min_pass không vượt số bộ lọc đang bật
-    n_on = sum(1 for v in state["filters_b"].values() if v)
-    if state["min_pass_b"] > n_on:
-        state["min_pass_b"] = max(1, n_on)
-    update.message.reply_text(
-        format_filter_update(key, is_on, state["filters_b"], state["min_pass_b"])
-    )
-
-
-def cmd_minpass_b(update, context):
-    """
-    /minpass_b 4
-    Đặt ngưỡng tối thiểu cần pass cho CL B.
-    """
-    if not context.args or not context.args[0].isdigit():
-        update.message.reply_text("❌ Dùng: /minpass_b 4")
-        return
-    val  = int(context.args[0])
-    n_on = sum(1 for v in state["filters_b"].values() if v)
-    if val < 1 or val > n_on:
-        update.message.reply_text(
-            f"⚠️ Ngưỡng phải từ 1 đến {n_on} (số bộ lọc đang bật)"
-        )
-        return
-    state["min_pass_b"] = val
-    update.message.reply_text(
-        format_minpass_update(val, state["filters_b"])
-    )
-
-
-
-def cmd_strategy_d(update, context):
-    new = toggle_strategy("ichistoch")
-    icon = "✅ BẬT" if new else "❌ TẮT"
-    update.message.reply_text(f"🌊 Chiến lược D — Ichimoku + Stochastic\nTrạng thái mới: {icon}\n\n{strategy_status()}")
-
-def cmd_ad(update, context):
-    if not context.args:
-        update.message.reply_text("❌ Dùng: /ad BTCUSDT")
-        return
-    symbol = _clean(context.args[0])
-    if add_symbol_d(symbol):
-        update.message.reply_text(f"✅ Đã thêm {symbol} vào CL D\n🌊 CL D: {_fmt_list(state['symbols_d'])}")
-    else:
-        update.message.reply_text(f"⚠️ {symbol} đã có trong CL D rồi")
-
-def cmd_rd(update, context):
-    if not context.args:
-        update.message.reply_text("❌ Dùng: /rd BTCUSDT")
-        return
-    symbol = _clean(context.args[0])
-    if remove_symbol_d(symbol):
-        update.message.reply_text(f"🗑 Đã xóa {symbol} khỏi CL D\n🌊 CL D: {_fmt_list(state['symbols_d'])}")
-    else:
-        update.message.reply_text(f"⚠️ {symbol} không có trong CL D")
-
-
-
-def cmd_reset_b(update, context):
-    """Reset tay tất cả lệnh đang IN_TRADE của CL B."""
-    from ema_strategy import _trades, _save_trades, get_trade_state
-    symbols = context.args if context.args else list(state["symbols_b"])
-    reset_list = []
-    for s in symbols:
-        sym = s.upper()
-        if not sym.endswith("USDT"):
-            sym += "USDT"
-        t = get_trade_state(sym)
-        if t["status"] == "IN_TRADE":
-            t["status"]      = "IDLE"
-            t["direction"]   = None
-            t["entry"]       = None
-            t["sl"]          = None
-            t["tp"]          = None
-            t["ts_entry"]    = None
-            t["ts_cooldown"] = None
-            reset_list.append(sym)
-    _save_trades(_trades)
-    if reset_list:
-        update.message.reply_text(
-            f"🔓 Đã reset CL B:\n" + "\n".join(f"  • {s}" for s in reset_list)
-        )
-    else:
-        update.message.reply_text("ℹ️ Không có lệnh nào đang IN_TRADE")
-
-
-
-def cmd_stats(update, context):
-    """Xem thống kê tất cả chiến lược 7 ngày."""
-    from trade_tracker import get_stats
-    update.message.reply_text(get_stats())
-
-
-def cmd_reset_tracker(update, context):
-    """Xóa lịch sử thống kê."""
-    from trade_tracker import reset_history
-    reset_history()
-    update.message.reply_text("🗑 Đã xóa lịch sử thống kê.")
-
-
-
-# ── Chiến lược SR commands ────────────────────────────────────
-def cmd_strategy_sr(update, context):
-    new = toggle_strategy("sr")
-    icon = "✅ BẬT" if new else "❌ TẮT"
-    update.message.reply_text(f"📊 Chiến lược Hỗ trợ Kháng cự\nTrạng thái: {icon}\n\n{strategy_status()}")
-
-def cmd_asr(update, context):
-    if not context.args:
-        update.message.reply_text("❌ Dùng: /asr BTCUSDT")
-        return
-    symbol = _clean(context.args[0])
-    if add_symbol_sr(symbol):
-        update.message.reply_text(f"✅ Đã thêm {symbol} vào CL SR\n📊 CL SR: {_fmt_list(state['symbols_sr'])}")
-    else:
-        update.message.reply_text(f"⚠️ {symbol} đã có trong CL SR rồi")
-
-def cmd_rsr(update, context):
-    if not context.args:
-        update.message.reply_text("❌ Dùng: /rsr BTCUSDT")
-        return
-    symbol = _clean(context.args[0])
-    if remove_symbol_sr(symbol):
-        update.message.reply_text(f"🗑 Đã xóa {symbol} khỏi CL SR\n📊 CL SR: {_fmt_list(state['symbols_sr'])}")
-    else:
-        update.message.reply_text(f"⚠️ {symbol} không có trong CL SR")
-
-def cmd_sr_params(update, context):
-    """Xem tất cả params hiện tại của CL SR."""
-    p = state.get("sr_params", {})
-    msg = "📊 Params CL Hỗ trợ Kháng cự:\n━━━━━━━━━━━━━━━━━━━━\n"
-    labels = {
-        "swing_length": "Swing Length (pivot)",
-        "box_width":    "Zone Width (ATR×)",
-        "stoch_k":      "Stoch K",
-        "stoch_sm":     "Stoch Smooth",
-        "stoch_d":      "Stoch D",
-        "stoch_ob":     "Overbought",
-        "stoch_os":     "Oversold",
-        "vol_ma":       "Volume MA",
-        "vol_mult":     "Volume Multiplier",
-        "wait_bars":    "Wait Bars",
-        "ma_len":       "MA Length",
-        "cooldown_min": "Cooldown (phút)",
-    }
-    for k, lbl in labels.items():
-        msg += f"  {lbl}: {p.get(k, '?')}\n"
-    msg += "━━━━━━━━━━━━━━━━━━━━\n"
-    msg += "✏️ Chỉnh: /sr_set [param] [value]\n"
-    msg += "Ví dụ: /sr_set swing_length 8"
+    from datetime import datetime, timezone, timedelta
+    now = datetime.now(timezone(timedelta(hours=7))).strftime("%d/%m %H:%M (UTC+7)")
+    def fl(syms): return ", ".join(s.replace("USDT","") for s in syms) if syms else "Trống"
+    msg  = f"📋 DANH SÁCH COIN
+🕐 {now}
+━━━━━━━━━━━━━━━━━━━━
+"
+    msg += f"☁️  CL A ({len(state['symbols_a'])}): {fl(state['symbols_a'])}
+"
+    msg += f"📈 CL B ({len(state['symbols_b'])}): {fl(state['symbols_b'])}
+"
+    msg += f"⚡ CL C ({len(state['symbols_c'])}): {fl(state['symbols_c'])}
+"
+    msg += f"🌊 CL D ({len(state['symbols_d'])}): {fl(state['symbols_d'])}
+"
+    msg += f"📊 CL SR ({len(state['symbols_sr'])}): {fl(state['symbols_sr'])}
+"
     update.message.reply_text(msg)
 
 def cmd_sr_set(update, context):
@@ -412,6 +137,40 @@ def run_telegram():
     updater.start_polling()
     print("✅ Telegram bot polling...")
 
+
+
+
+def cmd_strategy_a(update, context):
+    new = toggle_strategy("ichimoku")
+    icon = "✅ BẬT" if new else "❌ TẮT"
+    update.message.reply_text(f"☁️ CL A — Ichimoku\nTrạng thái: {icon}")
+
+def cmd_strategy_b(update, context):
+    new = toggle_strategy("ema")
+    icon = "✅ BẬT" if new else "❌ TẮT"
+    update.message.reply_text(f"📈 CL B — EMA+MACD\nTrạng thái: {icon}")
+
+def cmd_strategies(update, context):
+    s   = state["strategies"]
+    sa  = "✅ BẬT" if s.get("ichimoku")  else "❌ TẮT"
+    sb  = "✅ BẬT" if s.get("ema")        else "❌ TẮT"
+    sc  = "✅ BẬT" if s.get("supertrend") else "❌ TẮT"
+    sd  = "✅ BẬT" if s.get("ichistoch")  else "❌ TẮT"
+    ssr = "✅ BẬT" if s.get("sr")         else "❌ TẮT"
+    confirms = ", ".join(state.get("confirms_c", [])) or "Không có"
+    msg = (
+        f"⚙️ TRẠNG THÁI CHIẾN LƯỢC\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"☁️  CL A — Ichimoku    : {sa}\n"
+        f"📈 CL B — EMA+MACD    : {sb}\n"
+        f"⚡ CL C — Supertrend  : {sc}\n"
+        f"  └ Confirmation: {confirms}\n"
+        f"🌊 CL D — IchiStoch   : {sd}\n"
+        f"📊 CL SR— H/T Kháng cự: {ssr}\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"Dùng /cl_a /cl_b /cl_c /cl_d /cl_sr để bật/tắt"
+    )
+    update.message.reply_text(msg)
 
 # ════════════════════════════════════════════════════════════
 #  CHIẾN LƯỢC C — Commands
@@ -647,8 +406,11 @@ def run_telegram():
     dp.add_handler(CommandHandler("ac",             cmd_ac))
     dp.add_handler(CommandHandler("rc",             cmd_rc))
     dp.add_handler(CommandHandler("strategy_a",     cmd_strategy_a))
+    dp.add_handler(CommandHandler("cl_a",      cmd_strategy_a))
     dp.add_handler(CommandHandler("strategy_b",     cmd_strategy_b))
+    dp.add_handler(CommandHandler("cl_b",      cmd_strategy_b))
     dp.add_handler(CommandHandler("strategy_c",     cmd_strategy_c))
+    dp.add_handler(CommandHandler("cl_c",      cmd_strategy_c))
     dp.add_handler(CommandHandler("strategies",     cmd_strategies))
     dp.add_handler(CommandHandler("set_confirm",    cmd_set_confirm))
     dp.add_handler(CommandHandler("add_confirm",    cmd_add_confirm))
@@ -661,6 +423,7 @@ def run_telegram():
     dp.add_handler(CommandHandler("stats",           cmd_stats))
     dp.add_handler(CommandHandler("reset_tracker",   cmd_reset_tracker))
     dp.add_handler(CommandHandler("strategy_d",     cmd_strategy_d))
+    dp.add_handler(CommandHandler("cl_d",      cmd_strategy_d))
     dp.add_handler(CommandHandler("strategy_sr",    cmd_strategy_sr))
     dp.add_handler(CommandHandler("asr",            cmd_asr))
     dp.add_handler(CommandHandler("rsr",            cmd_rsr))

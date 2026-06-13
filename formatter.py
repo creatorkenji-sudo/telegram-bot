@@ -170,27 +170,27 @@ def format_strategy_c(symbol: str, sig: dict) -> str:
 # ════════════════════════════════════════════════════════════
 #  CHUNG — startup / status / heartbeat
 # ════════════════════════════════════════════════════════════
-def format_startup(symbols_a, symbols_b, symbols_c=None, symbols_d=None, symbols_sr=None) -> str:
-    ca  = _fmt(symbols_a)
-    cb  = _fmt(symbols_b)
-    cc  = _fmt(symbols_c)  if symbols_c  is not None else "Trống"
-    cd  = _fmt(symbols_d)  if symbols_d  is not None else "Trống"
-    csr = _fmt(symbols_sr) if symbols_sr is not None else "Trống"
+def format_startup(symbols_a, symbols_b, symbols_c=None, symbols_d=None, symbols_sr=None, strategies=None) -> str:
+    sa  = "✅" if not strategies or strategies.get("ichimoku")  else "❌"
+    sb  = "✅" if not strategies or strategies.get("ema")        else "❌"
+    sc  = "✅" if not strategies or strategies.get("supertrend") else "❌"
+    sd  = "✅" if not strategies or strategies.get("ichistoch")  else "❌"
+    ssr = "✅" if not strategies or strategies.get("sr")         else "❌"
+    na  = len(symbols_a)  if symbols_a  else 0
+    nb  = len(symbols_b)  if symbols_b  else 0
+    nc  = len(symbols_c)  if symbols_c  else 0
+    nd  = len(symbols_d)  if symbols_d  else 0
+    nsr = len(symbols_sr) if symbols_sr else 0
     return (
         f"✅  BOT CRYPTO ALERT BẬT\n"
         f"🕐 {_now()}\n"
         f"━━━━━━━━━━━━━━━━━━━━\n"
-        f"☁️  CL A (Ichimoku)    : {ca}\n"
-        f"📈 CL B (EMA+MACD)     : {cb}\n"
-        f"⚡ CL C (Supertrend)   : {cc}\n"
-        f"🌊 CL D (IchiStoch)    : {cd}\n"
-        f"📊 CL SR (H/T Kháng cự): {csr}\n"
-        f"⚖️ R:R : 1:{RR_RATIO}  ·  SL {SL_PERCENT}%\n"
+        f"☁️  CL A (Ichimoku)     {sa} · {na} coin\n"
+        f"📈 CL B (EMA+MACD)      {sb} · {nb} coin\n"
+        f"⚡ CL C (Supertrend)    {sc} · {nc} coin\n"
+        f"🌊 CL D (IchiStoch)     {sd} · {nd} coin\n"
+        f"📊 CL SR (H/T Kháng cự) {ssr} · {nsr} coin\n"
         f"━━━━━━━━━━━━━━━━━━━━\n"
-        f"/aa /ra — CL A  ·  /ab /rb — CL B\n"
-        f"/ac /rc — CL C  ·  /ad /rd — CL D\n"
-        f"/asr /rsr — CL SR\n"
-        f"/add /remove — cả 5\n"
         f"/menu — xem tất cả lệnh"
     )
 
@@ -198,76 +198,54 @@ def format_startup(symbols_a, symbols_b, symbols_c=None, symbols_d=None, symbols
 def format_status(symbols_a, symbols_b, strategies=None,
                   symbols_c=None, confirms_c=None, symbols_d=None,
                   symbols_sr=None) -> str:
-    ca  = _fmt_list(symbols_a)
-    cb  = _fmt_list(symbols_b)
-    cc  = _fmt_list(symbols_c)  if symbols_c  else "  (Trống)"
-    cd  = _fmt_list(symbols_d)  if symbols_d  else "  (Trống)"
-    csr = _fmt_list(symbols_sr) if symbols_sr else "  (Trống)"
-
-    if strategies:
-        sa  = "✅ BẬT" if strategies.get("ichimoku")  else "❌ TẮT"
-        sb  = "✅ BẬT" if strategies.get("ema")        else "❌ TẮT"
-        sc  = "✅ BẬT" if strategies.get("supertrend") else "❌ TẮT"
-        sd  = "✅ BẬT" if strategies.get("ichistoch")  else "❌ TẮT"
-        ssr = "✅ BẬT" if strategies.get("sr")         else "❌ TẮT"
-        strat = (
-            f"━━━━━━━━━━━━━━━━━━━━\n"
-            f"⚙️  Chiến lược:\n"
-            f"  ☁️  A — Ichimoku    : {sa}\n"
-            f"  📈 B — EMA+MACD    : {sb}\n"
-            f"  ⚡ C — Supertrend  : {sc}\n"
-            f"  🌊 D — IchiStoch   : {sd}\n"
-            f"  📊 SR— H/T Kháng cự: {ssr}\n"
-        )
-    else:
-        strat = ""
-
+    sa  = "✅ BẬT" if not strategies or strategies.get("ichimoku")  else "❌ TẮT"
+    sb  = "✅ BẬT" if not strategies or strategies.get("ema")        else "❌ TẮT"
+    sc  = "✅ BẬT" if not strategies or strategies.get("supertrend") else "❌ TẮT"
+    sd  = "✅ BẬT" if not strategies or strategies.get("ichistoch")  else "❌ TẮT"
+    ssr = "✅ BẬT" if not strategies or strategies.get("sr")         else "❌ TẮT"
+    na  = len(symbols_a)  if symbols_a  else 0
+    nb  = len(symbols_b)  if symbols_b  else 0
+    nc  = len(symbols_c)  if symbols_c  else 0
+    nd  = len(symbols_d)  if symbols_d  else 0
+    nsr = len(symbols_sr) if symbols_sr else 0
     conf_line = ""
-    if confirms_c is not None:
+    if confirms_c:
         active = ", ".join(confirms_c) if confirms_c else "Không có"
-        conf_line = f"━━━━━━━━━━━━━━━━━━━━\n🔧 CL C confirmation: {active}\n"
-
+        conf_line = f"  └ Confirmation: {active}\n"
     return (
-        f"📋  TRẠNG THÁI BOT\n"
+        f"📋 TRẠNG THÁI BOT\n"
         f"🕐 {_now()}\n"
         f"━━━━━━━━━━━━━━━━━━━━\n"
-        f"☁️  CL A (Ichimoku):\n{ca}\n"
-        f"━━━━━━━━━━━━━━━━━━━━\n"
-        f"📈 CL B (EMA+MACD):\n{cb}\n"
-        f"━━━━━━━━━━━━━━━━━━━━\n"
-        f"⚡ CL C (Supertrend):\n{cc}\n"
-        f"━━━━━━━━━━━━━━━━━━━━\n"
-        f"🌊 CL D (IchiStoch):\n{cd}\n"
-        f"━━━━━━━━━━━━━━━━━━━━\n"
-        f"📊 CL SR (H/T Kháng cự):\n{csr}\n"
-        f"{strat}"
+        f"☁️  CL A (Ichimoku)     : {sa} · {na} coin\n"
+        f"📈 CL B (EMA+MACD)      : {sb} · {nb} coin\n"
+        f"⚡ CL C (Supertrend)    : {sc} · {nc} coin\n"
         f"{conf_line}"
+        f"🌊 CL D (IchiStoch)     : {sd} · {nd} coin\n"
+        f"📊 CL SR (H/T Kháng cự) : {ssr} · {nsr} coin\n"
         f"━━━━━━━━━━━━━━━━━━━━\n"
-        f"⚖️ R:R = 1:{RR_RATIO}  ·  SL {SL_PERCENT}%"
+        f"⚖️ R:R = 1:{RR_RATIO}  ·  SL {SL_PERCENT}%\n"
+        f"/list — xem danh sách coin"
     )
 
 
 def format_heartbeat(symbols_a, symbols_b, strategies,
                      symbols_c=None, symbols_d=None, symbols_sr=None) -> str:
-    ca  = _fmt(symbols_a)
-    cb  = _fmt(symbols_b)
-    cc  = _fmt(symbols_c)  if symbols_c  else "Trống"
-    cd  = _fmt(symbols_d)  if symbols_d  else "Trống"
-    csr = _fmt(symbols_sr) if symbols_sr else "Trống"
     sa  = "✅" if strategies.get("ichimoku")  else "❌"
     sb  = "✅" if strategies.get("ema")        else "❌"
     sc  = "✅" if strategies.get("supertrend") else "❌"
     sd  = "✅" if strategies.get("ichistoch")  else "❌"
     ssr = "✅" if strategies.get("sr")         else "❌"
+    na  = len(symbols_a)  if symbols_a  else 0
+    nb  = len(symbols_b)  if symbols_b  else 0
+    nc  = len(symbols_c)  if symbols_c  else 0
+    nd  = len(symbols_d)  if symbols_d  else 0
+    nsr = len(symbols_sr) if symbols_sr else 0
     return (
-        f"💚  BOT ĐANG HOẠT ĐỘNG\n"
+        f"💚 BOT ĐANG HOẠT ĐỘNG\n"
         f"🕐 {_now()}\n"
         f"━━━━━━━━━━━━━━━━━━━━\n"
-        f"☁️  CL A {sa}: {ca}\n"
-        f"📈 CL B {sb}: {cb}\n"
-        f"⚡ CL C {sc}: {cc}\n"
-        f"🌊 CL D {sd}: {cd}\n"
-        f"📊 SR   {ssr}: {csr}\n"
+        f"☁️  A {sa} 📈 B {sb} ⚡ C {sc} 🌊 D {sd} 📊 SR {ssr}\n"
+        f"Coin: A={na} B={nb} C={nc} D={nd} SR={nsr}\n"
         f"━━━━━━━━━━━━━━━━━━━━\n"
         f"✅ Hoạt động bình thường"
     )
