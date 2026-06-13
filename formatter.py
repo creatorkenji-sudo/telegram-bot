@@ -352,6 +352,39 @@ def format_sltp_result(symbol: str, result: dict) -> str:
         f"{bar}"
     )
 
+
+
+# ════════════════════════════════════════════════════════════
+#  CHIẾN LƯỢC HỖ TRỢ KHÁNG CỰ (SR)
+# ════════════════════════════════════════════════════════════
+def format_strategy_sr(symbol: str, sig: dict) -> str:
+    coin   = symbol.replace("USDT", "")
+    is_long = sig["type"] == "LONG"
+
+    if is_long:
+        bar   = "🟢📊══════════════════📊🟢"
+        title = f"🚀 LONG — {coin}/USDT"
+        zone  = "🟢 Giá tại vùng DEMAND (Hỗ trợ)"
+    else:
+        bar   = "🔴📊══════════════════📊🔴"
+        title = f"💥 SHORT — {coin}/USDT"
+        zone  = "🔴 Giá tại vùng SUPPLY (Kháng cự)"
+
+    return (
+        f"{bar}\n{title}\n"
+        f"🕐 {_now()} · ⏰ 15m\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"💰 Giá         : {sig['price']:,.4f} USDT\n"
+        f"{zone}\n"
+        f"🕯 Mẫu nến     : {sig['pattern']}\n"
+        f"⚡ Stoch %K/%D : {sig['k_line']} / {sig['d_line']}\n"
+        f"📊 Volume      : {int(sig['vol_pct'])}% MA\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"📌 Chiến lược Hỗ trợ Kháng cự\n"
+        f"⚠️ Không phải lời khuyên đầu tư!\n"
+        f"{bar}"
+    )
+
 # Alias
 format_entry = format_ichimoku_entry
 format_setup = format_ichimoku_entry

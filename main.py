@@ -9,6 +9,7 @@ from data import get_klines
 from trade_tracker import track_entry, check_all, format_result, get_stats, reset_history
 from strategy_c import check_strategy_c
 from strategy_d import check_strategy_d
+from strategy_sr import check_strategy_sr
 from trend import multi_trend, detect_kumo_cross
 from entry import check_entry
 from ema_strategy import check_ema_signal, check_sltp, get_trade_state
@@ -170,6 +171,19 @@ def run_strategy_d(symbol: str):
         price = df_m15["close"].iloc[-1]
         print(f"  —  [D] {symbol}: ${price:,.4f} | chờ tín hiệu")
 
+
+# ── Chiến lược SR: Hỗ trợ Kháng cự ──────────────────────────
+def run_strategy_sr(symbol: str):
+    if not state["strategies"].get("sr"):
+        return
+    df = get_klines(symbol, TIMEFRAMES["m15"])
+    sig = check_strategy_sr(symbol, df, state)
+    if sig:
+        send(format_strategy_sr(symbol, sig))
+        state["last_sr_signal"][symbol] = sig["type"]
+        track_entry(symbol, "CL_SR", sig["type"], sig["price"], sig["price"], sig["price"])
+        print(f"  📊 [SR] {symbol}: {sig['type']} ${sig['price']}")
+
 # ── Main loop ────────────────────────────────────────────────
 def main():
     send(format_startup(state["symbols_a"], state["symbols_b"], state["symbols_c"], state["symbols_d"]))
@@ -197,6 +211,13 @@ def main():
                 run_strategy_c(symbol)
             except Exception as e:
                 print(f"  ❌ [C] {symbol}: {e}")
+
+        # Chiến lược SR — Hỗ trợ Kháng cự
+        for symbol in list(state["symbols_sr"]):
+            try:
+                run_strategy_sr(symbol)
+            except Exception as e:
+                print(f"  ❌ [SR] {symbol}: {e}")
 
         # Chiến lược D — danh sách riêng
         for symbol in list(state["symbols_d"]):

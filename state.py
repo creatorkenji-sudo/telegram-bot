@@ -11,6 +11,22 @@ state = {
     "symbols_b": list(DEFAULT_SYMBOLS),   # Chiến lược B
     "symbols_c": list(DEFAULT_SYMBOLS),   # Chiến lược C
     "symbols_d": list(DEFAULT_SYMBOLS),   # Chiến lược D
+    "symbols_sr": list(DEFAULT_SYMBOLS),  # Chiến lược SR
+    "last_sr_signal": {},
+    "sr_params": {
+        "swing_length": 10,
+        "box_width":    2.5,
+        "stoch_k":      14,
+        "stoch_sm":     3,
+        "stoch_d":      3,
+        "stoch_ob":     80,
+        "stoch_os":     20,
+        "vol_ma":       20,
+        "vol_mult":     1.2,
+        "wait_bars":    3,
+        "ma_len":       20,
+        "cooldown_min": 30,
+    },
 
     # ── Bật/tắt chiến lược — khai báo đầy đủ ngay từ đầu ────
     "strategies": {
@@ -18,6 +34,7 @@ state = {
         "ema":        True,
         "supertrend": True,
         "ichistoch":  True,   # Chiến lược D
+        "sr":         True,    # Chiến lược SR
     },
 
     # ── Confirmation CL C ─────────────────────────────────────
@@ -113,14 +130,31 @@ def remove_symbol_d(symbol: str) -> bool:
         return True
     return False
 
+
+
+def add_symbol_sr(symbol: str) -> bool:
+    s = symbol.upper()
+    if s not in state["symbols_sr"]:
+        state["symbols_sr"].append(s)
+        return True
+    return False
+
+def remove_symbol_sr(symbol: str) -> bool:
+    s = symbol.upper()
+    if s in state["symbols_sr"]:
+        state["symbols_sr"].remove(s)
+        state["last_sr_signal"].pop(s, None)
+        return True
+    return False
+
 # ── Thêm/xóa cả 3 ────────────────────────────────────────────
 def add_symbol(symbol: str) -> bool:
     s = symbol.upper()
-    return add_symbol_a(s) | add_symbol_b(s) | add_symbol_c(s) | add_symbol_d(s)
+    return add_symbol_a(s) | add_symbol_b(s) | add_symbol_c(s) | add_symbol_d(s) | add_symbol_sr(s)
 
 def remove_symbol(symbol: str) -> bool:
     s = symbol.upper()
-    return remove_symbol_a(s) | remove_symbol_b(s) | remove_symbol_c(s) | remove_symbol_d(s)
+    return remove_symbol_a(s) | remove_symbol_b(s) | remove_symbol_c(s) | remove_symbol_d(s) | remove_symbol_sr(s)
 
 
 # ── Bật/tắt chiến lược ───────────────────────────────────────

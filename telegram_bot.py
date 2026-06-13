@@ -11,6 +11,7 @@ from state import (
     add_symbol_b, remove_symbol_b,
     add_symbol_c, remove_symbol_c,
     add_symbol_d, remove_symbol_d,
+    add_symbol_sr, remove_symbol_sr,
     toggle_strategy, strategy_status,
 )
 from config import TOKEN
@@ -298,6 +299,93 @@ def cmd_reset_tracker(update, context):
     update.message.reply_text("🗑 Đã xóa lịch sử thống kê.")
 
 
+
+# ── Chiến lược SR commands ────────────────────────────────────
+def cmd_strategy_sr(update, context):
+    new = toggle_strategy("sr")
+    icon = "✅ BẬT" if new else "❌ TẮT"
+    update.message.reply_text(f"📊 Chiến lược Hỗ trợ Kháng cự\nTrạng thái: {icon}\n\n{strategy_status()}")
+
+def cmd_asr(update, context):
+    if not context.args:
+        update.message.reply_text("❌ Dùng: /asr BTCUSDT")
+        return
+    symbol = _clean(context.args[0])
+    if add_symbol_sr(symbol):
+        update.message.reply_text(f"✅ Đã thêm {symbol} vào CL SR\n📊 CL SR: {_fmt_list(state['symbols_sr'])}")
+    else:
+        update.message.reply_text(f"⚠️ {symbol} đã có trong CL SR rồi")
+
+def cmd_rsr(update, context):
+    if not context.args:
+        update.message.reply_text("❌ Dùng: /rsr BTCUSDT")
+        return
+    symbol = _clean(context.args[0])
+    if remove_symbol_sr(symbol):
+        update.message.reply_text(f"🗑 Đã xóa {symbol} khỏi CL SR\n📊 CL SR: {_fmt_list(state['symbols_sr'])}")
+    else:
+        update.message.reply_text(f"⚠️ {symbol} không có trong CL SR")
+
+def cmd_sr_params(update, context):
+    """Xem tất cả params hiện tại của CL SR."""
+    p = state.get("sr_params", {})
+    msg = "📊 Params CL Hỗ trợ Kháng cự:\n━━━━━━━━━━━━━━━━━━━━\n"
+    labels = {
+        "swing_length": "Swing Length (pivot)",
+        "box_width":    "Zone Width (ATR×)",
+        "stoch_k":      "Stoch K",
+        "stoch_sm":     "Stoch Smooth",
+        "stoch_d":      "Stoch D",
+        "stoch_ob":     "Overbought",
+        "stoch_os":     "Oversold",
+        "vol_ma":       "Volume MA",
+        "vol_mult":     "Volume Multiplier",
+        "wait_bars":    "Wait Bars",
+        "ma_len":       "MA Length",
+        "cooldown_min": "Cooldown (phút)",
+    }
+    for k, lbl in labels.items():
+        msg += f"  {lbl}: {p.get(k, '?')}\n"
+    msg += "━━━━━━━━━━━━━━━━━━━━\n"
+    msg += "✏️ Chỉnh: /sr_set [param] [value]\n"
+    msg += "Ví dụ: /sr_set swing_length 8"
+    update.message.reply_text(msg)
+
+def cmd_sr_set(update, context):
+    """Chỉnh sửa 1 param: /sr_set [key] [value]"""
+    if len(context.args) < 2:
+        update.message.reply_text("❌ Dùng: /sr_set [param] [value]\nVí dụ: /sr_set swing_length 8")
+        return
+    key = context.args[0].lower()
+    try:
+        val = float(context.args[1])
+    except ValueError:
+        update.message.reply_text("❌ Giá trị phải là số")
+        return
+
+    valid_keys = ["swing_length","box_width","stoch_k","stoch_sm","stoch_d",
+                  "stoch_ob","stoch_os","vol_ma","vol_mult","wait_bars","ma_len","cooldown_min"]
+    int_keys   = ["swing_length","stoch_k","stoch_sm","stoch_d","stoch_ob",
+                  "stoch_os","vol_ma","wait_bars","ma_len","cooldown_min"]
+
+    if key not in valid_keys:
+        update.message.reply_text(f"❌ Param không hợp lệ\nCác param: {', '.join(valid_keys)}")
+        return
+
+    if "sr_params" not in state:
+        from strategy_sr import DEFAULT_PARAMS
+        state["sr_params"] = DEFAULT_PARAMS.copy()
+
+    state["sr_params"][key] = int(val) if key in int_keys else round(val, 2)
+    update.message.reply_text(f"✅ Đã cập nhật: {key} = {state['sr_params'][key]}\n\nGõ /sr_params để xem tất cả")
+
+def cmd_sr_reset(update, context):
+    """Reset về params mặc định."""
+    from strategy_sr import DEFAULT_PARAMS
+    state["sr_params"] = DEFAULT_PARAMS.copy()
+    update.message.reply_text("🔄 Đã reset CL SR về params mặc định\n\nGõ /sr_params để xem")
+
+
 def run_telegram():
     updater = Updater(TOKEN, use_context=True)
     updater.bot.delete_webhook(drop_pending_updates=True)
@@ -568,6 +656,12 @@ def run_telegram():
     dp.add_handler(CommandHandler("stats",           cmd_stats))
     dp.add_handler(CommandHandler("reset_tracker",   cmd_reset_tracker))
     dp.add_handler(CommandHandler("strategy_d",     cmd_strategy_d))
+    dp.add_handler(CommandHandler("strategy_sr",    cmd_strategy_sr))
+    dp.add_handler(CommandHandler("asr",            cmd_asr))
+    dp.add_handler(CommandHandler("rsr",            cmd_rsr))
+    dp.add_handler(CommandHandler("sr_params",      cmd_sr_params))
+    dp.add_handler(CommandHandler("sr_set",         cmd_sr_set))
+    dp.add_handler(CommandHandler("sr_reset",       cmd_sr_reset))
     dp.add_handler(CommandHandler("ad",             cmd_ad))
     dp.add_handler(CommandHandler("rd",             cmd_rd))
 
