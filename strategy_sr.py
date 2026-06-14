@@ -188,34 +188,37 @@ def check_strategy_sr(symbol: str, df: pd.DataFrame, state: dict) -> list:
     bos_wait = params["bos_wait"]
     ma_buf  = params["ma_buf_pct"] / 100
 
-    price   = float(df["close"].iloc[-1])
-    price_1 = float(df["close"].iloc[-2])
+    # Dùng nến ĐÃ ĐÓNG — bỏ nến cuối (đang chạy) ra khỏi mọi tính toán
+    df_closed = df.iloc[:-1].reset_index(drop=True)
 
-    # Indicators
-    ma      = _ema(df["close"], params["ma_len"])
-    ema200  = _ema(df["close"], params["ema200_len"])
+    price   = float(df_closed["close"].iloc[-1])   # nến đã đóng gần nhất
+    price_1 = float(df_closed["close"].iloc[-2])   # nến đã đóng trước đó
+
+    # Indicators — tính trên df_closed
+    ma      = _ema(df_closed["close"], params["ma_len"])
+    ema200  = _ema(df_closed["close"], params["ema200_len"])
     ma_val  = float(ma.iloc[-1])
     ma_val1 = float(ma.iloc[-2])
     ma_val2 = float(ma.iloc[-3])
 
-    k_line, d_line = _stoch(df, params["stoch_k"], params["stoch_sm"], params["stoch_d"])
+    k_line, d_line = _stoch(df_closed, params["stoch_k"], params["stoch_sm"], params["stoch_d"])
     k_cur  = float(k_line.iloc[-1])
     k_prv  = float(k_line.iloc[-2])
     d_cur  = float(d_line.iloc[-1])
     d_prv  = float(d_line.iloc[-2])
 
-    vol_ma     = float(df["volume"].rolling(params["vol_ma"]).mean().iloc[-1])
-    vol_strong = float(df["volume"].iloc[-1]) > vol_ma * params["vol_mult"]
-    vol_pct    = round(float(df["volume"].iloc[-1]) / vol_ma * 100)
+    vol_ma     = float(df_closed["volume"].rolling(params["vol_ma"]).mean().iloc[-1])
+    vol_strong = float(df_closed["volume"].iloc[-1]) > vol_ma * params["vol_mult"]
+    vol_pct    = round(float(df_closed["volume"].iloc[-1]) / vol_ma * 100)
 
-    bull_candle = price > float(df["open"].iloc[-1])
-    bear_candle = price < float(df["open"].iloc[-1])
+    bull_candle = price > float(df_closed["open"].iloc[-1])
+    bear_candle = price < float(df_closed["open"].iloc[-1])
     stoch_long  = k_cur > d_cur and k_prv <= d_cur and k_cur < params["stoch_ob"]
     stoch_short = k_cur < d_cur and k_prv >= d_cur and k_cur > params["stoch_os"]
 
-    zones, atr  = _get_zones(df, params)
-    dem_zones   = _price_in_zone(df, zones, "demand")
-    sup_zones   = _price_in_zone(df, zones, "supply")
+    zones, atr  = _get_zones(df_closed, params)
+    dem_zones   = _price_in_zone(df_closed, zones, "demand")
+    sup_zones   = _price_in_zone(df_closed, zones, "supply")
     in_demand   = len(dem_zones) > 0
     in_supply   = len(sup_zones) > 0
 
@@ -261,7 +264,7 @@ def check_strategy_sr(symbol: str, df: pd.DataFrame, state: dict) -> list:
     if bs["bos_up"]:
         bs["bos_bars"] += 1
         # Chạm MA20 trong buffer
-        low_cur = float(df["low"].iloc[-1])
+        low_cur = float(df_closed["low"].iloc[-1])
         if low_cur <= ma_val and price >= ma_val - ma_val * ma_buf and ma_val > ma_val1:
             bs["ma_touched"] = True
         # Reset nếu MA dốc xuống 2 nến
