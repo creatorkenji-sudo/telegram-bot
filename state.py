@@ -29,6 +29,7 @@ state = {
         "ma_buf_pct":   0.3,
         "bos_wait":     20,
         "cooldown_min": 30,
+        "touch_signal": False,
     },
 
     # ── Bật/tắt chiến lược — khai báo đầy đủ ngay từ đầu ────

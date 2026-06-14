@@ -9,7 +9,7 @@ from data import get_klines
 from trade_tracker import track_entry, check_all, format_result, get_stats, reset_history
 from strategy_c import check_strategy_c
 from strategy_d import check_strategy_d
-from strategy_sr import check_strategy_sr, DEFAULT_PARAMS as SR_DEFAULT_PARAMS
+from strategy_sr import check_strategy_sr, check_zone_reaction, DEFAULT_PARAMS as SR_DEFAULT_PARAMS
 from trend import multi_trend, detect_kumo_cross
 from entry import check_entry
 from ema_strategy import check_ema_signal, check_sltp, get_trade_state
@@ -208,6 +208,13 @@ def run_strategy_sr(symbol: str):
     df_m15  = get_klines(symbol, TIMEFRAMES["m15"])
     sigs_m15 = check_strategy_sr(symbol + "_m15", df_m15, state)
     _send_sr_signals(symbol, sigs_m15, "15m", include_bos_break=True)
+
+    # ── Zone Reaction (TOUCH/BREAK/REJECT) — chạy riêng trên H1 ──
+    sr_params = state.get("sr_params", {})
+    if sr_params.get("touch_signal", False):
+        df_h1 = get_klines(symbol, TIMEFRAMES["h1"])
+        sigs_h1 = check_zone_reaction(symbol + "_h1", df_h1, state)
+        _send_sr_signals(symbol, sigs_h1, "1h", include_bos_break=False)
 
 # ── Main loop ────────────────────────────────────────────────
 def main():

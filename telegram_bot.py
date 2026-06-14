@@ -117,6 +117,19 @@ def cmd_sr_reset(update, context):
 
 
 
+
+
+def cmd_sr_touch(update, context):
+    """Bật/tắt signal chạm vùng (TOUCH/BREAK/REJECT). Mặc định TẮT — chỉ phát LONG/SHORT/BOS."""
+    if "sr_params" not in state:
+        from strategy_sr import DEFAULT_PARAMS
+        state["sr_params"] = DEFAULT_PARAMS.copy()
+    cur = state["sr_params"].get("touch_signal", False)
+    state["sr_params"]["touch_signal"] = not cur
+    icon = "✅ BẬT" if not cur else "❌ TẮT"
+    update.message.reply_text(f"🔶 Signal chạm vùng H1 (Touch/Break/Reject)\nTrạng thái: {icon}\n\nKhi TẮT chỉ phát LONG/SHORT/BOS Pullback/BOS Break (M5/M15)\nKhi BẬT thêm check TOUCH/BREAK/REJECT trên khung H1")
+
+
 def cmd_menu(update, context):
     update.message.reply_text(format_menu())
 
@@ -318,7 +331,9 @@ def cmd_sr_params(update, context):
     }
     for k, lbl in labels.items():
         msg += f"  {lbl}: {p.get(k, '?')}\n"
-    msg += "━━━━━━━━━━━━━━━━━━━━\n/sr_set [param] [value]"
+    touch_icon = "✅ BẬT" if p.get("touch_signal", False) else "❌ TẮT"
+    msg += f"  🔶 Signal chạm vùng H1 (Touch/Break/Reject): {touch_icon}\n"
+    msg += "━━━━━━━━━━━━━━━━━━━━\n/sr_set [param] [value]\n/sr_touch — bật/tắt signal chạm vùng"
     update.message.reply_text(msg)
 
 # ════════════════════════════════════════════════════════════
@@ -575,6 +590,7 @@ def run_telegram():
     dp.add_handler(CommandHandler("sr_params",      cmd_sr_params))
     dp.add_handler(CommandHandler("sr_set",         cmd_sr_set))
     dp.add_handler(CommandHandler("sr_reset",       cmd_sr_reset))
+    dp.add_handler(CommandHandler("sr_touch",       cmd_sr_touch))
     dp.add_handler(CommandHandler("menu",            cmd_menu))
     dp.add_handler(CommandHandler("ad",             cmd_ad))
     dp.add_handler(CommandHandler("rd",             cmd_rd))
