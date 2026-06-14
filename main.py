@@ -19,6 +19,7 @@ from formatter import (
     format_ema_signal, format_sltp_result, format_startup, format_heartbeat,
     format_strategy_c, format_strategy_d,
     format_sr_long, format_sr_short, format_sr_bos_long, format_sr_bos_break,
+    format_sr_touch, format_sr_break, format_sr_reject,
     format_menu, format_status
 )
 from state import state
@@ -181,14 +182,20 @@ def _send_sr_signals(symbol: str, signals: list, tf_label: str, include_bos_brea
         sig["tf"] = tf_label
         if t == "LONG":
             send(format_sr_long(symbol, sig))
-            track_entry(symbol, "CL_SR", "LONG", sig["price"], sig["price"], sig["price"])
+            track_entry(symbol, "CL_SR", "LONG", sig["entry"], sig["sl"], sig["tp"])
         elif t == "SHORT":
             send(format_sr_short(symbol, sig))
-            track_entry(symbol, "CL_SR", "SHORT", sig["price"], sig["price"], sig["price"])
+            track_entry(symbol, "CL_SR", "SHORT", sig["entry"], sig["sl"], sig["tp"])
         elif t == "BOS_LONG":
             send(format_sr_bos_long(symbol, sig))
         elif t == "BOS_BREAK" and include_bos_break:
             send(format_sr_bos_break(symbol, sig))
+        elif t == "TOUCH":
+            send(format_sr_touch(symbol, sig))
+        elif t == "BREAK":
+            send(format_sr_break(symbol, sig))
+        elif t == "REJECT":
+            send(format_sr_reject(symbol, sig))
 
 def run_strategy_sr(symbol: str):
     if not state["strategies"].get("sr"):

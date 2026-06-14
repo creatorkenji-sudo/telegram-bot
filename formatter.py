@@ -438,7 +438,9 @@ def format_sr_long(symbol: str, sig: dict) -> str:
         f"🚀 LONG — {coin}/USDT · {sig.get('tf','15m')}\n"
         f"🕐 {_now()}\n"
         f"━━━━━━━━━━━━━━━━━━━━\n"
-        f"💰 Giá      : {sig['price']:,.4f}\n"
+        f"💰 Entry    : {sig.get('entry', sig['price']):,.4f}\n"
+        f"🛑 SL       : {sig.get('sl', 0):,.4f}\n"
+        f"🎯 TP       : {sig.get('tp', 0):,.4f}  (R:R 1:2)\n"
         f"📍 Demand   : {sig['zone_bot']:,.4f} – {sig['zone_top']:,.4f}\n"
         f"{pat}\n"
         f"⚡ Stoch    : {sig['k_line']} / {sig['d_line']}\n"
@@ -457,7 +459,9 @@ def format_sr_short(symbol: str, sig: dict) -> str:
         f"💥 SHORT — {coin}/USDT · {sig.get('tf','15m')}\n"
         f"🕐 {_now()}\n"
         f"━━━━━━━━━━━━━━━━━━━━\n"
-        f"💰 Giá      : {sig['price']:,.4f}\n"
+        f"💰 Entry    : {sig.get('entry', sig['price']):,.4f}\n"
+        f"🛑 SL       : {sig.get('sl', 0):,.4f}\n"
+        f"🎯 TP       : {sig.get('tp', 0):,.4f}  (R:R 1:2)\n"
         f"📍 Supply   : {sig['zone_bot']:,.4f} – {sig['zone_top']:,.4f}\n"
         f"{pat}\n"
         f"⚡ Stoch    : {sig['k_line']} / {sig['d_line']}\n"
@@ -490,6 +494,51 @@ def format_sr_bos_break(symbol: str, sig: dict) -> str:
         return (
             f"🟡 B↓ {coin} phá hỗ trợ\n"
             f"Giá: {sig['price']:,.4f} · Vùng: {sig['zone_level']:,.4f}\n"
+            f"🕐 {_now()}"
+        )
+
+
+
+# ════════════════════════════════════════════════════════════
+#  TOUCH / BREAK / REJECT — Chạm / Phá / Đảo chiều
+# ════════════════════════════════════════════════════════════
+def format_sr_touch(symbol: str, sig: dict) -> str:
+    coin = symbol.replace("USDT", "")
+    zname = "Kháng cự" if sig["zone_type"] == "supply" else "Hỗ trợ"
+    icon  = "🔶" if sig["zone_type"] == "supply" else "🔷"
+    return (
+        f"{icon} {coin} chạm {zname}\n"
+        f"Giá: {sig['price']:,.4f} · Vùng: {sig['zone_bot']:,.4f}–{sig['zone_top']:,.4f}\n"
+        f"🕐 {_now()}"
+    )
+
+def format_sr_break(symbol: str, sig: dict) -> str:
+    coin = symbol.replace("USDT", "")
+    if sig["zone_type"] == "supply":
+        return (
+            f"🔵 {coin} PHÁ Kháng cự — giá tăng tiếp\n"
+            f"Giá: {sig['price']:,.4f} · Vùng: {sig['zone_bot']:,.4f}–{sig['zone_top']:,.4f}\n"
+            f"🕐 {_now()}"
+        )
+    else:
+        return (
+            f"🟠 {coin} PHÁ Hỗ trợ — giá giảm tiếp\n"
+            f"Giá: {sig['price']:,.4f} · Vùng: {sig['zone_bot']:,.4f}–{sig['zone_top']:,.4f}\n"
+            f"🕐 {_now()}"
+        )
+
+def format_sr_reject(symbol: str, sig: dict) -> str:
+    coin = symbol.replace("USDT", "")
+    if sig["zone_type"] == "supply":
+        return (
+            f"🟡 {coin} KHÔNG PHÁ Kháng cự — đảo chiều giảm\n"
+            f"Giá: {sig['price']:,.4f} · Vùng: {sig['zone_bot']:,.4f}–{sig['zone_top']:,.4f}\n"
+            f"🕐 {_now()}"
+        )
+    else:
+        return (
+            f"🟢 {coin} KHÔNG PHÁ Hỗ trợ — đảo chiều tăng\n"
+            f"Giá: {sig['price']:,.4f} · Vùng: {sig['zone_bot']:,.4f}–{sig['zone_top']:,.4f}\n"
             f"🕐 {_now()}"
         )
 
