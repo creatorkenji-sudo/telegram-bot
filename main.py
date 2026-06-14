@@ -209,12 +209,15 @@ def run_strategy_sr(symbol: str):
     sigs_m15 = check_strategy_sr(symbol + "_m15", df_m15, state)
     _send_sr_signals(symbol, sigs_m15, "15m", include_bos_break=True)
 
-    # ── Zone Reaction (TOUCH/BREAK/REJECT) — chạy riêng trên H1 ──
+    # ── Zone Reaction (TOUCH/BREAK/REJECT) — khung tùy chỉnh qua /sr_set zone_reaction_tf ──
     sr_params = state.get("sr_params", {})
     if sr_params.get("touch_signal", False):
-        df_h1 = get_klines(symbol, TIMEFRAMES["h1"])
-        sigs_h1 = check_zone_reaction(symbol + "_h1", df_h1, state)
-        _send_sr_signals(symbol, sigs_h1, "1h", include_bos_break=False)
+        zr_tf = sr_params.get("zone_reaction_tf", "h1")
+        tf_code  = TIMEFRAMES.get(zr_tf, TIMEFRAMES["h1"])
+        tf_label = {"m5": "5m", "m15": "15m", "h1": "1h", "h4": "4h"}.get(zr_tf, "1h")
+        df_zr = get_klines(symbol, tf_code)
+        sigs_zr = check_zone_reaction(symbol + "_" + zr_tf, df_zr, state)
+        _send_sr_signals(symbol, sigs_zr, tf_label, include_bos_break=False)
 
 # ── Main loop ────────────────────────────────────────────────
 def main():

@@ -30,6 +30,7 @@ DEFAULT_PARAMS = {
     "bos_wait":     20,
     "cooldown_min": 30,
     "touch_signal": False,  # bật/tắt báo TOUCH/BREAK/REJECT (chạm vùng kháng cự/hỗ trợ)
+    "zone_reaction_tf": "h1",  # khung tính TOUCH/BREAK/REJECT: m5/m15/h1/h4
 }
 
 # ── Zone state per symbol ─────────────────────────────────────

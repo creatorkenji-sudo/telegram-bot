@@ -30,6 +30,7 @@ state = {
         "bos_wait":     20,
         "cooldown_min": 30,
         "touch_signal": False,
+        "zone_reaction_tf": "h1",
     },
 
     # ── Bật/tắt chiến lược — khai báo đầy đủ ngay từ đầu ────

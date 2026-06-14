@@ -83,9 +83,30 @@ def cmd_list(update, context):
 def cmd_sr_set(update, context):
     """Chỉnh sửa 1 param: /sr_set [key] [value]"""
     if len(context.args) < 2:
-        update.message.reply_text("❌ Dùng: /sr_set [param] [value]\nVí dụ: /sr_set swing_length 8")
+        update.message.reply_text(
+            "❌ Dùng: /sr_set [param] [value]\n"
+            "Ví dụ: /sr_set swing_length 8\n"
+            "Ví dụ: /sr_set zone_reaction_tf m15"
+        )
         return
     key = context.args[0].lower()
+
+    if "sr_params" not in state:
+        from strategy_sr import DEFAULT_PARAMS
+        state["sr_params"] = DEFAULT_PARAMS.copy()
+
+    # ── Param dạng string: timeframe ──
+    if key == "zone_reaction_tf":
+        tf = context.args[1].lower()
+        valid_tf = ["m5", "m15", "h1", "h4"]
+        if tf not in valid_tf:
+            update.message.reply_text(f"❌ Timeframe không hợp lệ\nChọn: {', '.join(valid_tf)}")
+            return
+        state["sr_params"]["zone_reaction_tf"] = tf
+        update.message.reply_text(f"✅ Đã cập nhật: zone_reaction_tf = {tf}\n\nGõ /sr_params để xem tất cả")
+        return
+
+    # ── Param dạng số ──
     try:
         val = float(context.args[1])
     except ValueError:
@@ -99,12 +120,8 @@ def cmd_sr_set(update, context):
                   "stoch_os","vol_ma","wait_bars","ma_len","ema200_len","bos_wait","cooldown_min"]
 
     if key not in valid_keys:
-        update.message.reply_text(f"❌ Param không hợp lệ\nCác param: {', '.join(valid_keys)}")
+        update.message.reply_text(f"❌ Param không hợp lệ\nCác param: {', '.join(valid_keys)}, zone_reaction_tf")
         return
-
-    if "sr_params" not in state:
-        from strategy_sr import DEFAULT_PARAMS
-        state["sr_params"] = DEFAULT_PARAMS.copy()
 
     state["sr_params"][key] = int(val) if key in int_keys else round(val, 2)
     update.message.reply_text(f"✅ Đã cập nhật: {key} = {state['sr_params'][key]}\n\nGõ /sr_params để xem tất cả")
@@ -332,7 +349,9 @@ def cmd_sr_params(update, context):
     for k, lbl in labels.items():
         msg += f"  {lbl}: {p.get(k, '?')}\n"
     touch_icon = "✅ BẬT" if p.get("touch_signal", False) else "❌ TẮT"
-    msg += f"  🔶 Signal chạm vùng H1 (Touch/Break/Reject): {touch_icon}\n"
+    msg += f"  🔶 Signal chạm vùng (Touch/Break/Reject): {touch_icon}\n"
+    zr_tf = p.get("zone_reaction_tf", "h1")
+    msg += f"  ⏱ Khung Zone Reaction: {zr_tf}\n"
     msg += "━━━━━━━━━━━━━━━━━━━━\n/sr_set [param] [value]\n/sr_touch — bật/tắt signal chạm vùng"
     update.message.reply_text(msg)
 
