@@ -93,9 +93,10 @@ def cmd_sr_set(update, context):
         return
 
     valid_keys = ["swing_length","box_width","stoch_k","stoch_sm","stoch_d",
-                  "stoch_ob","stoch_os","vol_ma","vol_mult","wait_bars","ma_len","cooldown_min"]
+                  "stoch_ob","stoch_os","vol_ma","vol_mult","wait_bars","ma_len",
+                  "ema200_len","ma_buf_pct","bos_wait","cooldown_min"]
     int_keys   = ["swing_length","stoch_k","stoch_sm","stoch_d","stoch_ob",
-                  "stoch_os","vol_ma","wait_bars","ma_len","cooldown_min"]
+                  "stoch_os","vol_ma","wait_bars","ma_len","ema200_len","bos_wait","cooldown_min"]
 
     if key not in valid_keys:
         update.message.reply_text(f"❌ Param không hợp lệ\nCác param: {', '.join(valid_keys)}")
@@ -311,7 +312,9 @@ def cmd_sr_params(update, context):
         "stoch_k": "Stoch K", "stoch_sm": "Stoch Smooth", "stoch_d": "Stoch D",
         "stoch_ob": "Overbought", "stoch_os": "Oversold",
         "vol_ma": "Volume MA", "vol_mult": "Volume Mult",
-        "wait_bars": "Wait Bars", "ma_len": "MA Length", "cooldown_min": "Cooldown (phút)",
+        "wait_bars": "Wait Bars", "ma_len": "MA Length",
+        "ema200_len": "EMA200 Length", "ma_buf_pct": "MA Touch Buffer %",
+        "bos_wait": "BOS Timeout (nến)", "cooldown_min": "Cooldown (phút)",
     }
     for k, lbl in labels.items():
         msg += f"  {lbl}: {p.get(k, '?')}\n"
@@ -439,10 +442,6 @@ def cmd_remove_confirm(update, context):
         f"🗑 Đã xóa: {CONFIRMATION_LABELS.get(name, name)}\n\n"
         f"{confirms_status()}"
     )
-
-
-# ── Đăng ký handler mới vào run_telegram ────────────────────
-_original_run = run_telegram
 
 
 def cmd_panel_b(update, context):
