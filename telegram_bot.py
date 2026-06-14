@@ -21,6 +21,14 @@ from formatter import format_startup, format_status, format_menu
 def _fmt_list(symbols: list) -> str:
     return ", ".join(s.replace("USDT","") for s in symbols) if symbols else "Trống"
 
+def _clean(symbol: str) -> str:
+    s = symbol.upper().strip()
+    if not s.endswith("USDT"):
+        s += "USDT"
+    return s
+
+
+
 
 # ── Lệnh chung ───────────────────────────────────────────────
 def cmd_start(update, context):
@@ -110,29 +118,6 @@ def cmd_sr_reset(update, context):
 
 def cmd_menu(update, context):
     update.message.reply_text(format_menu())
-
-
-def run_telegram():
-    updater = Updater(TOKEN, use_context=True)
-    updater.bot.delete_webhook(drop_pending_updates=True)
-
-    dp = updater.dispatcher
-    dp.add_handler(CommandHandler("start",      cmd_start))
-    dp.add_handler(CommandHandler("add",        cmd_add))
-    dp.add_handler(CommandHandler("remove",     cmd_remove))
-    dp.add_handler(CommandHandler("list",       cmd_list))
-    dp.add_handler(CommandHandler("status",     cmd_status))
-    dp.add_handler(CommandHandler("aa",         cmd_aa))
-    dp.add_handler(CommandHandler("ra",         cmd_ra))
-    dp.add_handler(CommandHandler("ab",         cmd_ab))
-    dp.add_handler(CommandHandler("rb",         cmd_rb))
-    dp.add_handler(CommandHandler("strategy_a", cmd_strategy_a))
-    dp.add_handler(CommandHandler("strategy_b", cmd_strategy_b))
-    dp.add_handler(CommandHandler("strategies", cmd_strategies))
-
-    updater.start_polling()
-    print("✅ Telegram bot polling...")
-
 
 
 
