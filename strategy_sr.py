@@ -223,6 +223,7 @@ def check_strategy_sr(symbol: str, df: pd.DataFrame, state: dict) -> list:
 
     price   = float(df_closed["close"].iloc[-1])   # nến đã đóng gần nhất
     price_1 = float(df_closed["close"].iloc[-2])   # nến đã đóng trước đó
+    candle_ts = float(df_closed["timestamp"].iloc[-1])  # mốc thời gian nến đã đóng gần nhất
 
     # Indicators — tính trên df_closed
     ma      = _ema(df_closed["close"], params["ma_len"])
@@ -314,75 +315,82 @@ def check_strategy_sr(symbol: str, df: pd.DataFrame, state: dict) -> list:
         keys = list(bs["reported_levels"].keys())[-30:]
         bs["reported_levels"] = {k: bs["reported_levels"][k] for k in keys}
 
-    # ── TOUCH / BREAK / REJECT — Chạm vùng → chờ nến đóng → Phá/Không phá ──
+    # ── TOUCH / BREAK / REJECT — 1 nến chạm vùng + đóng → kết quả ngay ──
+    # Mỗi nến đã đóng (candle_ts) chỉ xử lý 1 lần cho mỗi vùng
     # Supply (Kháng cự)
     for z in [z for z in zones if z["type"] == "supply"]:
         zkey = ("supply", round(z["mid"], 4))
-        # Nến hiện tại (đã đóng) có chạm vùng?
-        touched_now = (df_closed["high"].iloc[-1] >= z["bot"] and df_closed["low"].iloc[-1] <= z["top"])
+        last_ts = bs["touched_zones"].get(zkey, 0)
+        if candle_ts <= last_ts:
+            continue  # nến này đã xử lý cho vùng này rồi
 
-        if zkey not in bs["touched_zones"]:
-            if touched_now:
-                # Lần đầu chạm → báo CHẠM, lưu lại để chờ kết quả nến tiếp theo
-                signals.append({
-                    "type": "TOUCH", "zone_type": "supply",
-                    "price": round(price, 4),
-                    "zone_top": round(z["top"], 4), "zone_bot": round(z["bot"], 4),
-                })
-                bs["touched_zones"][zkey] = True
+        # Nến đã đóng có chạm vùng? (high/low chạm, bất kể close ở đâu)
+        touched_now = (df_closed["high"].iloc[-1] >= z["bot"] and df_closed["low"].iloc[-1] <= z["top"])
+        if not touched_now:
+            continue
+
+        bs["touched_zones"][zkey] = candle_ts  # đánh dấu đã xử lý nến này cho vùng này
+
+        if price > z["top"]:
+            # Close đóng TRÊN vùng → đã phá kháng cự
+            signals.append({
+                "type": "BREAK", "zone_type": "supply", "direction": "UP",
+                "price": round(price, 4),
+                "zone_top": round(z["top"], 4), "zone_bot": round(z["bot"], 4),
+            })
+        elif price < z["bot"]:
+            # Close đóng DƯỚI vùng → không phá, đảo chiều giảm
+            signals.append({
+                "type": "REJECT", "zone_type": "supply", "direction": "DOWN",
+                "price": round(price, 4),
+                "zone_top": round(z["top"], 4), "zone_bot": round(z["bot"], 4),
+            })
         else:
-            # Đã chạm trước đó — nến này là nến xác nhận kết quả
-            if price > z["top"]:
-                signals.append({
-                    "type": "BREAK", "zone_type": "supply", "direction": "UP",
-                    "price": round(price, 4),
-                    "zone_top": round(z["top"], 4), "zone_bot": round(z["bot"], 4),
-                })
-            elif price < z["bot"]:
-                signals.append({
-                    "type": "REJECT", "zone_type": "supply", "direction": "DOWN",
-                    "price": round(price, 4),
-                    "zone_top": round(z["top"], 4), "zone_bot": round(z["bot"], 4),
-                })
-            else:
-                # Vẫn trong vùng — chờ thêm, không xóa
-                continue
-            del bs["touched_zones"][zkey]
+            # Close vẫn trong vùng → chỉ báo chạm
+            signals.append({
+                "type": "TOUCH", "zone_type": "supply",
+                "price": round(price, 4),
+                "zone_top": round(z["top"], 4), "zone_bot": round(z["bot"], 4),
+            })
 
     # Demand (Hỗ trợ)
     for z in [z for z in zones if z["type"] == "demand"]:
         zkey = ("demand", round(z["mid"], 4))
-        touched_now = (df_closed["high"].iloc[-1] >= z["bot"] and df_closed["low"].iloc[-1] <= z["top"])
+        last_ts = bs["touched_zones"].get(zkey, 0)
+        if candle_ts <= last_ts:
+            continue
 
-        if zkey not in bs["touched_zones"]:
-            if touched_now:
-                signals.append({
-                    "type": "TOUCH", "zone_type": "demand",
-                    "price": round(price, 4),
-                    "zone_top": round(z["top"], 4), "zone_bot": round(z["bot"], 4),
-                })
-                bs["touched_zones"][zkey] = True
+        touched_now = (df_closed["high"].iloc[-1] >= z["bot"] and df_closed["low"].iloc[-1] <= z["top"])
+        if not touched_now:
+            continue
+
+        bs["touched_zones"][zkey] = candle_ts
+
+        if price < z["bot"]:
+            # Close đóng DƯỚI vùng → đã phá hỗ trợ
+            signals.append({
+                "type": "BREAK", "zone_type": "demand", "direction": "DOWN",
+                "price": round(price, 4),
+                "zone_top": round(z["top"], 4), "zone_bot": round(z["bot"], 4),
+            })
+        elif price > z["top"]:
+            # Close đóng TRÊN vùng → không phá, đảo chiều tăng
+            signals.append({
+                "type": "REJECT", "zone_type": "demand", "direction": "UP",
+                "price": round(price, 4),
+                "zone_top": round(z["top"], 4), "zone_bot": round(z["bot"], 4),
+            })
         else:
-            if price < z["bot"]:
-                signals.append({
-                    "type": "BREAK", "zone_type": "demand", "direction": "DOWN",
-                    "price": round(price, 4),
-                    "zone_top": round(z["top"], 4), "zone_bot": round(z["bot"], 4),
-                })
-            elif price > z["top"]:
-                signals.append({
-                    "type": "REJECT", "zone_type": "demand", "direction": "UP",
-                    "price": round(price, 4),
-                    "zone_top": round(z["top"], 4), "zone_bot": round(z["bot"], 4),
-                })
-            else:
-                continue
-            del bs["touched_zones"][zkey]
+            signals.append({
+                "type": "TOUCH", "zone_type": "demand",
+                "price": round(price, 4),
+                "zone_top": round(z["top"], 4), "zone_bot": round(z["bot"], 4),
+            })
 
     # Giới hạn touched_zones
     if len(bs["touched_zones"]) > 30:
         keys = list(bs["touched_zones"].keys())[-20:]
-        bs["touched_zones"] = {k: True for k in keys}
+        bs["touched_zones"] = {k: bs["touched_zones"][k] for k in keys}
 
     # ── BOS PULLBACK tracking ──────────────────────────────────
     if bs["bos_up"]:
