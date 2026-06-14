@@ -175,7 +175,7 @@ def run_strategy_d(symbol: str):
 
 
 # ── Chiến lược SR: Hỗ trợ Kháng cự ──────────────────────────
-def _send_sr_signals(symbol: str, signals: list, tf_label: str):
+def _send_sr_signals(symbol: str, signals: list, tf_label: str, include_bos_break: bool):
     for sig in signals:
         t = sig["type"]
         sig["tf"] = tf_label
@@ -187,20 +187,20 @@ def _send_sr_signals(symbol: str, signals: list, tf_label: str):
             track_entry(symbol, "CL_SR", "SHORT", sig["price"], sig["price"], sig["price"])
         elif t == "BOS_LONG":
             send(format_sr_bos_long(symbol, sig))
-        elif t == "BOS_BREAK":
+        elif t == "BOS_BREAK" and include_bos_break:
             send(format_sr_bos_break(symbol, sig))
 
 def run_strategy_sr(symbol: str):
     if not state["strategies"].get("sr"):
         return
-    # Check M5
+    # Check M5 — chỉ LONG/SHORT/BOS_LONG, KHÔNG báo BOS_BREAK (tránh spam)
     df_m5  = get_klines(symbol, TIMEFRAMES["m5"])
     sigs_m5 = check_strategy_sr(symbol + "_m5", df_m5, state)
-    _send_sr_signals(symbol, sigs_m5, "5m")
-    # Check M15
+    _send_sr_signals(symbol, sigs_m5, "5m", include_bos_break=True)
+    # Check M15 — đầy đủ tất cả signal, BOS_BREAK xác nhận trên nến 15m đã đóng
     df_m15  = get_klines(symbol, TIMEFRAMES["m15"])
     sigs_m15 = check_strategy_sr(symbol + "_m15", df_m15, state)
-    _send_sr_signals(symbol, sigs_m15, "15m")
+    _send_sr_signals(symbol, sigs_m15, "15m", include_bos_break=True)
 
 # ── Main loop ────────────────────────────────────────────────
 def main():

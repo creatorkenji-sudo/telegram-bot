@@ -57,6 +57,7 @@ def get_bos_state(symbol: str) -> dict:
             "bos_up":     False,
             "ma_touched": False,
             "bos_bars":   0,
+            "reported_levels": set(),   # các mức giá đã báo BOS break
         }
     return _bos_state[symbol]
 
@@ -220,17 +221,18 @@ def check_strategy_sr(symbol: str, df: pd.DataFrame, state: dict) -> list:
 
     signals = []
 
-    # ── BOS BREAK detection ────────────────────────────────────
+    # ── BOS BREAK detection — chỉ báo 1 lần/vùng, dùng nến đã đóng ──
     # Supply bị phá (close[1] >= top supply)
     for z in [z for z in zones if z["type"] == "supply"]:
-        if price_1 >= z["top"]:
-            # BOS Break Up
+        level_key = ("UP", round(z["top"], 4))
+        if price_1 >= z["top"] and level_key not in bs["reported_levels"]:
             signals.append({
                 "type":     "BOS_BREAK",
                 "direction":"UP",
                 "price":    round(price, 4),
                 "zone_level": round(z["top"], 4),
             })
+            bs["reported_levels"].add(level_key)
             # Kích hoạt BOS UP nếu MA đang tăng
             if price_1 > ma_val and ma_val > ma_val1:
                 bs["bos_up"]     = True
@@ -240,14 +242,20 @@ def check_strategy_sr(symbol: str, df: pd.DataFrame, state: dict) -> list:
 
     # Demand bị phá (close[1] <= bot demand)
     for z in [z for z in zones if z["type"] == "demand"]:
-        if price_1 <= z["bot"]:
+        level_key = ("DOWN", round(z["bot"], 4))
+        if price_1 <= z["bot"] and level_key not in bs["reported_levels"]:
             signals.append({
                 "type":     "BOS_BREAK",
                 "direction":"DOWN",
                 "price":    round(price, 4),
                 "zone_level": round(z["bot"], 4),
             })
+            bs["reported_levels"].add(level_key)
             break
+
+    # Giới hạn kích thước set tránh phình to vô hạn
+    if len(bs["reported_levels"]) > 50:
+        bs["reported_levels"] = set(list(bs["reported_levels"])[-30:])
 
     # ── BOS PULLBACK tracking ──────────────────────────────────
     if bs["bos_up"]:
