@@ -59,6 +59,7 @@ def get_bos_state(symbol: str) -> dict:
             "bos_bars":   0,
             "reported_levels": {},  # {(direction, level): {"ts": time, "in_zone": bool}}
             "touched_zones": {},    # {(type, level): True}  — đã báo "chạm", chờ kết quả
+            "initialized": False,   # False = lần check đầu tiên, bỏ qua TOUCH/BREAK/REJECT/BOS_BREAK
         }
     return _bos_state[symbol]
 
@@ -110,6 +111,24 @@ def _pivot_low(df: pd.DataFrame, length: int):
 # ════════════════════════════════════════════════════════════
 #  ZONE DETECTION
 # ════════════════════════════════════════════════════════════
+def _merge_zones(zone_list: list, atr: float) -> list:
+    """Gộp các vùng chồng lấp/gần nhau (khoảng cách < ATR*2) thành 1 vùng"""
+    if not zone_list:
+        return []
+    zone_list = sorted(zone_list, key=lambda z: z["bot"])
+    merged = [zone_list[0]]
+    for z in zone_list[1:]:
+        last = merged[-1]
+        # Nếu 2 vùng chồng lấp hoặc gần nhau (gap < ATR*2) → gộp
+        if z["bot"] <= last["top"] + atr * 2:
+            last["top"] = max(last["top"], z["top"])
+            last["bot"] = min(last["bot"], z["bot"])
+            last["mid"] = (last["top"] + last["bot"]) / 2
+        else:
+            merged.append(z)
+    return merged
+
+
 def _get_zones(df: pd.DataFrame, params: dict):
     swing  = params["swing_length"]
     bw     = params["box_width"]
@@ -119,12 +138,22 @@ def _get_zones(df: pd.DataFrame, params: dict):
     ph_list = _pivot_high(df, swing)[-5:]
     pl_list = _pivot_low(df,  swing)[-5:]
 
-    zones = []
+    sup_zones = []
+    dem_zones = []
     for val in ph_list:
-        zones.append({"type": "supply", "top": val, "bot": val - buf, "mid": val - buf/2})
+        sup_zones.append({"type": "supply", "top": val, "bot": val - buf, "mid": val - buf/2})
     for val in pl_list:
-        zones.append({"type": "demand", "top": val + buf, "bot": val, "mid": val + buf/2})
-    return zones, atr
+        dem_zones.append({"type": "demand", "top": val + buf, "bot": val, "mid": val + buf/2})
+
+    # Gộp các vùng gần/chồng nhau
+    sup_zones = _merge_zones(sup_zones, atr)
+    dem_zones = _merge_zones(dem_zones, atr)
+    for z in sup_zones:
+        z["type"] = "supply"
+    for z in dem_zones:
+        z["type"] = "demand"
+
+    return sup_zones + dem_zones, atr
 
 
 def _price_in_zone(df: pd.DataFrame, zones: list, zone_type: str) -> list:
@@ -226,6 +255,7 @@ def check_strategy_sr(symbol: str, df: pd.DataFrame, state: dict) -> list:
     signals = []
     now = time.time()
     BOS_LOCK_SEC = 15 * 60  # 15 phút
+    first_run = not bs["initialized"]
 
     # ── BOS BREAK detection — lock 15 phút, báo lại khi thoát-vào-lại vùng ──
     # Supply bị phá (close[1] >= top supply) → giá đang TRÊN vùng (phá lên)
@@ -455,6 +485,11 @@ def check_strategy_sr(symbol: str, df: pd.DataFrame, state: dict) -> list:
                 "vol_pct":  vol_pct,
             })
             _last_signal[cd_key] = {"ts": time.time()}
+
+    # Lần check đầu tiên của symbol — chỉ ghi nhận trạng thái, không báo
+    if first_run:
+        bs["initialized"] = True
+        signals = [s for s in signals if s["type"] not in ("TOUCH", "BREAK", "REJECT", "BOS_BREAK")]
 
     if signals:
         print(f"  📊 [SR] {symbol}: {[s['type'] for s in signals]}")
