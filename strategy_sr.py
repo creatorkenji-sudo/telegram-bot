@@ -1,9 +1,10 @@
 # ============================================================
 #  strategy_sr.py — Chiến lược Hỗ trợ Kháng cự (ZoneCandle)
 #
-#  Signal 1: LONG/SHORT Zone — giá chạm Demand/Supply
-#  Signal 2: BOS Pullback    — phá kháng cự + pullback MA20
-#  Signal 3: BOS Break       — thông báo khi phá vùng
+#  Signal 1: LONG/SHORT Zone     — chạy trên H1 + H4
+#  Signal 2: BOS Pullback        — chạy trên M15 + H1
+#  Signal 3: TOUCH/BREAK/REJECT  — chạy trên H1 + H4 (mặc định BẬT)
+#  Signal 4: MA20/EMA200 Cross   — chạy độc lập trên M15, H1, H4
 # ============================================================
 import time
 import numpy as np
@@ -29,13 +30,13 @@ DEFAULT_PARAMS = {
     "ma_buf_pct":   0.3,
     "bos_wait":     20,
     "cooldown_min": 30,
-    "touch_signal": False,  # bật/tắt báo TOUCH/BREAK/REJECT (chạm vùng kháng cự/hỗ trợ)
-    "zone_reaction_tf": "h1",  # khung tính TOUCH/BREAK/REJECT: m5/m15/h1/h4
+    "touch_signal": True,   # TOUCH/BREAK/REJECT — mặc định BẬT, thay cho BOS Break
 }
 
-# ── Zone state per symbol ─────────────────────────────────────
+# ── State riêng theo symbol+suffix khung ──────────────────────
 _zone_state: dict = {}
 _bos_state:  dict = {}
+_ma_cross_state: dict = {}
 
 
 def get_params(state: dict) -> dict:
@@ -59,11 +60,16 @@ def get_bos_state(symbol: str) -> dict:
             "bos_up":     False,
             "ma_touched": False,
             "bos_bars":   0,
-            "reported_levels": {},  # {(direction, level): {"ts": time, "in_zone": bool}}
-            "touched_zones": {},    # {(type, level): True}  — đã báo "chạm", chờ kết quả
-            "initialized": False,   # False = lần check đầu tiên, bỏ qua TOUCH/BREAK/REJECT/BOS_BREAK
+            "touched_zones": {},   # {(zone_type, mid): last_candle_ts} — cho TOUCH/BREAK/REJECT
+            "initialized":   False,
         }
     return _bos_state[symbol]
+
+
+def get_ma_cross_state(symbol: str) -> dict:
+    if symbol not in _ma_cross_state:
+        _ma_cross_state[symbol] = {"initialized": False}
+    return _ma_cross_state[symbol]
 
 
 # ════════════════════════════════════════════════════════════
@@ -111,17 +117,15 @@ def _pivot_low(df: pd.DataFrame, length: int):
 
 
 # ════════════════════════════════════════════════════════════
-#  ZONE DETECTION
+#  ZONE DETECTION — gộp vùng chồng lấp/gần nhau
 # ════════════════════════════════════════════════════════════
 def _merge_zones(zone_list: list, atr: float) -> list:
-    """Gộp các vùng chồng lấp/gần nhau (khoảng cách < ATR*2) thành 1 vùng"""
     if not zone_list:
         return []
     zone_list = sorted(zone_list, key=lambda z: z["bot"])
     merged = [zone_list[0]]
     for z in zone_list[1:]:
         last = merged[-1]
-        # Nếu 2 vùng chồng lấp hoặc gần nhau (gap < ATR*2) → gộp
         if z["bot"] <= last["top"] + atr * 2:
             last["top"] = max(last["top"], z["top"])
             last["bot"] = min(last["bot"], z["bot"])
@@ -140,14 +144,9 @@ def _get_zones(df: pd.DataFrame, params: dict):
     ph_list = _pivot_high(df, swing)[-5:]
     pl_list = _pivot_low(df,  swing)[-5:]
 
-    sup_zones = []
-    dem_zones = []
-    for val in ph_list:
-        sup_zones.append({"type": "supply", "top": val, "bot": val - buf, "mid": val - buf/2})
-    for val in pl_list:
-        dem_zones.append({"type": "demand", "top": val + buf, "bot": val, "mid": val + buf/2})
+    sup_zones = [{"type": "supply", "top": v, "bot": v - buf, "mid": v - buf/2} for v in ph_list]
+    dem_zones = [{"type": "demand", "top": v + buf, "bot": v, "mid": v + buf/2} for v in pl_list]
 
-    # Gộp các vùng gần/chồng nhau
     sup_zones = _merge_zones(sup_zones, atr)
     dem_zones = _merge_zones(dem_zones, atr)
     for z in sup_zones:
@@ -159,7 +158,6 @@ def _get_zones(df: pd.DataFrame, params: dict):
 
 
 def _price_in_zone(df: pd.DataFrame, zones: list, zone_type: str) -> list:
-    """Trả về list các vùng mà giá hiện tại đang chạm"""
     high = df["high"].iloc[-1]
     low  = df["low"].iloc[-1]
     matched = []
@@ -171,31 +169,22 @@ def _price_in_zone(df: pd.DataFrame, zones: list, zone_type: str) -> list:
     return matched
 
 
-def _nearest_supply_above(price: float, zones: list):
-    candidates = [z for z in zones if z["type"] == "supply" and z["bot"] > price]
-    return min(candidates, key=lambda z: z["bot"]) if candidates else None
-
-
 # ════════════════════════════════════════════════════════════
 #  CANDLE PATTERNS
 # ════════════════════════════════════════════════════════════
 def _detect_pattern(df: pd.DataFrame) -> str:
     c, o = df["close"], df["open"]
-    # Bull Engulfing
     if (c.iloc[-1] > o.iloc[-1] and c.iloc[-2] < o.iloc[-2] and
             c.iloc[-1] > o.iloc[-2] and o.iloc[-1] < c.iloc[-2]):
         return "Bull Engulfing"
-    # Three Outside Up
     c1 = c.iloc[-3] < o.iloc[-3]
     c2 = c.iloc[-2] > o.iloc[-2]
     c3 = c.iloc[-1] > o.iloc[-1] and o.iloc[-1] <= o.iloc[-3] and c.iloc[-1] >= c.iloc[-2]
     if c1 and c2 and c3:
         return "3LS↑"
-    # Bear Engulfing
     if (c.iloc[-1] < o.iloc[-1] and c.iloc[-2] > o.iloc[-2] and
             c.iloc[-1] < o.iloc[-2] and o.iloc[-1] > c.iloc[-2]):
         return "Bear Engulfing"
-    # Three Outside Down
     d1 = c.iloc[-3] > o.iloc[-3]
     d2 = c.iloc[-2] < o.iloc[-2]
     d3 = c.iloc[-1] < o.iloc[-1] and o.iloc[-1] >= o.iloc[-3] and c.iloc[-1] <= c.iloc[-2]
@@ -204,13 +193,20 @@ def _detect_pattern(df: pd.DataFrame) -> str:
     return ""
 
 
+def _nearest_supply_above(price: float, zones: list):
+    candidates = [z for z in zones if z["type"] == "supply" and z["bot"] > price]
+    return min(candidates, key=lambda z: z["bot"]) if candidates else None
+
+
 # ════════════════════════════════════════════════════════════
-#  MAIN CHECK
+#  SIGNAL 1 — LONG/SHORT ZONE  (chạy trên H1 + H4)
+#  SIGNAL 2 — BOS PULLBACK     (chạy trên M15 + H1)
+#  Dùng chung 1 hàm check_strategy_sr; symbol đã có suffix khung
 # ════════════════════════════════════════════════════════════
 def check_strategy_sr(symbol: str, df: pd.DataFrame, state: dict) -> list:
     """
-    Trả về list các signal dict (có thể nhiều signal cùng lúc).
-    Mỗi signal: {type, sub_type, price, ...}
+    Trả về list signal dict cho LONG/SHORT/BOS_LONG.
+    symbol: đã có suffix khung, ví dụ BTCUSDT_zoneH1, BTCUSDT_bosM15
     """
     params  = get_params(state)
     zs      = get_zone_state(symbol)
@@ -220,16 +216,14 @@ def check_strategy_sr(symbol: str, df: pd.DataFrame, state: dict) -> list:
     bos_wait = params["bos_wait"]
     ma_buf  = params["ma_buf_pct"] / 100
 
-    # Dùng nến ĐÃ ĐÓNG — bỏ nến cuối (đang chạy) ra khỏi mọi tính toán
     df_closed = df.iloc[:-1].reset_index(drop=True)
+    if len(df_closed) < 60:
+        return []
 
-    price   = float(df_closed["close"].iloc[-1])   # nến đã đóng gần nhất
-    price_1 = float(df_closed["close"].iloc[-2])   # nến đã đóng trước đó
-    candle_ts = float(df_closed["timestamp"].iloc[-1])  # mốc thời gian nến đã đóng gần nhất
+    price   = float(df_closed["close"].iloc[-1])
+    price_1 = float(df_closed["close"].iloc[-2])
 
-    # Indicators — tính trên df_closed
     ma      = _ema(df_closed["close"], params["ma_len"])
-    ema200  = _ema(df_closed["close"], params["ema200_len"])
     ma_val  = float(ma.iloc[-1])
     ma_val1 = float(ma.iloc[-2])
     ma_val2 = float(ma.iloc[-3])
@@ -256,84 +250,29 @@ def check_strategy_sr(symbol: str, df: pd.DataFrame, state: dict) -> list:
     in_supply   = len(sup_zones) > 0
 
     signals = []
-    now = time.time()
-    BOS_LOCK_SEC = 15 * 60  # 15 phút
-    first_run = not bs["initialized"]
 
-    # ── BOS BREAK detection — lock 15 phút, báo lại khi thoát-vào-lại vùng ──
-    # Supply bị phá (close[1] >= top supply) → giá đang TRÊN vùng (phá lên)
+    # ── Kích hoạt BOS UP khi Supply bị phá (close[1] >= top supply) ──
     for z in [z for z in zones if z["type"] == "supply"]:
-        level_key = ("UP", round(z["top"], 4))
-        price_above = price_1 >= z["top"]   # giá đang trên/trong vùng (đã phá)
-        rec = bs["reported_levels"].get(level_key)
-
-        if price_above:
-            if rec is None:
-                # Lần đầu phá vùng → báo ngay
-                signals.append({"type": "BOS_BREAK", "direction": "UP",
-                                 "price": round(price, 4), "zone_level": round(z["top"], 4)})
-                bs["reported_levels"][level_key] = {"ts": now, "in_zone": True}
-                if price_1 > ma_val and ma_val > ma_val1:
-                    bs["bos_up"] = True
-                    bs["ma_touched"] = False
-                    bs["bos_bars"] = 0
-            else:
-                # Đã báo trước đó — chỉ báo lại nếu đã qua 15p VÀ giá vẫn trong vùng
-                if now - rec["ts"] >= BOS_LOCK_SEC and rec["in_zone"]:
-                    signals.append({"type": "BOS_BREAK", "direction": "UP",
-                                     "price": round(price, 4), "zone_level": round(z["top"], 4)})
-                    rec["ts"] = now
-                rec["in_zone"] = True
-        else:
-            # Giá thoát khỏi vùng → reset để lần sau vào lại báo ngay
-            if rec is not None:
-                rec["in_zone"] = False
-        break
-
-    # Demand bị phá (close[1] <= bot demand) → giá đang DƯỚI vùng (phá xuống)
-    for z in [z for z in zones if z["type"] == "demand"]:
-        level_key = ("DOWN", round(z["bot"], 4))
-        price_below = price_1 <= z["bot"]
-        rec = bs["reported_levels"].get(level_key)
-
-        if price_below:
-            if rec is None:
-                signals.append({"type": "BOS_BREAK", "direction": "DOWN",
-                                 "price": round(price, 4), "zone_level": round(z["bot"], 4)})
-                bs["reported_levels"][level_key] = {"ts": now, "in_zone": True}
-            else:
-                if now - rec["ts"] >= BOS_LOCK_SEC and rec["in_zone"]:
-                    signals.append({"type": "BOS_BREAK", "direction": "DOWN",
-                                     "price": round(price, 4), "zone_level": round(z["bot"], 4)})
-                    rec["ts"] = now
-                rec["in_zone"] = True
-        else:
-            if rec is not None:
-                rec["in_zone"] = False
-        break
-
-    # Giới hạn kích thước dict tránh phình to vô hạn
-    if len(bs["reported_levels"]) > 50:
-        keys = list(bs["reported_levels"].keys())[-30:]
-        bs["reported_levels"] = {k: bs["reported_levels"][k] for k in keys}
+        if price_1 >= z["top"]:
+            if price_1 > ma_val and ma_val > ma_val1:
+                bs["bos_up"]     = True
+                bs["ma_touched"] = False
+                bs["bos_bars"]   = 0
+            break
 
     # ── BOS PULLBACK tracking ──────────────────────────────────
     if bs["bos_up"]:
         bs["bos_bars"] += 1
-        # Chạm MA20 trong buffer
         low_cur = float(df_closed["low"].iloc[-1])
         if low_cur <= ma_val and price >= ma_val - ma_val * ma_buf and ma_val > ma_val1:
             bs["ma_touched"] = True
-        # Reset nếu MA dốc xuống 2 nến
         if ma_val < ma_val2 and ma_val1 < ma_val2:
             bs["bos_up"] = bs["ma_touched"] = False
             bs["bos_bars"] = 0
-        # Timeout
         if bs["bos_bars"] > bos_wait:
             bs["bos_up"] = bs["ma_touched"] = False
             bs["bos_bars"] = 0
 
-    # ── BOS LONG signal ────────────────────────────────────────
     if bs["bos_up"] and bs["ma_touched"] and price > ma_val and price_1 <= ma_val and bull_candle:
         cd_key = f"{symbol}_bos"
         elapsed = time.time() - _last_signal.get(cd_key, {}).get("ts", 0)
@@ -367,7 +306,7 @@ def check_strategy_sr(symbol: str, df: pd.DataFrame, state: dict) -> list:
             zs["supply_active"] = False
             zs["supply_bars"]   = 0
 
-    # ── Zone LONG signal ───────────────────────────────────────
+    # ── Zone LONG ───────────────────────────────────────────────
     if zs["demand_active"] and bull_candle and vol_strong and stoch_long and price > price_1:
         cd_key = f"{symbol}_long"
         elapsed = time.time() - _last_signal.get(cd_key, {}).get("ts", 0)
@@ -377,7 +316,7 @@ def check_strategy_sr(symbol: str, df: pd.DataFrame, state: dict) -> list:
             entry   = price
             sl      = zone.get("bot", entry * 0.985)
             risk    = entry - sl
-            tp      = entry + risk * 2   # R:R 1:2
+            tp      = entry + risk * 2
             signals.append({
                 "type":     "LONG",
                 "price":    round(price, 4),
@@ -393,7 +332,7 @@ def check_strategy_sr(symbol: str, df: pd.DataFrame, state: dict) -> list:
             })
             _last_signal[cd_key] = {"ts": time.time()}
 
-    # ── Zone SHORT signal ──────────────────────────────────────
+    # ── Zone SHORT ──────────────────────────────────────────────
     if zs["supply_active"] and bear_candle and vol_strong and stoch_short and price < price_1:
         cd_key = f"{symbol}_short"
         elapsed = time.time() - _last_signal.get(cd_key, {}).get("ts", 0)
@@ -403,7 +342,7 @@ def check_strategy_sr(symbol: str, df: pd.DataFrame, state: dict) -> list:
             entry   = price
             sl      = zone.get("top", entry * 1.015)
             risk    = sl - entry
-            tp      = entry - risk * 2   # R:R 1:2
+            tp      = entry - risk * 2
             signals.append({
                 "type":     "SHORT",
                 "price":    round(price, 4),
@@ -419,62 +358,48 @@ def check_strategy_sr(symbol: str, df: pd.DataFrame, state: dict) -> list:
             })
             _last_signal[cd_key] = {"ts": time.time()}
 
-    # Lần check đầu tiên của symbol — chỉ ghi nhận trạng thái, không báo
-    if first_run:
-        bs["initialized"] = True
-        signals = [s for s in signals if s["type"] not in ("TOUCH", "BREAK", "REJECT", "BOS_BREAK")]
-
     if signals:
         print(f"  📊 [SR] {symbol}: {[s['type'] for s in signals]}")
-    else:
-        print(f"    — [SR] {symbol}: ${price:.4f} | dem={zs['demand_active']} sup={zs['supply_active']} bos={bs['bos_up']} k={k_cur:.1f}")
 
     return signals
 
 
 # ════════════════════════════════════════════════════════════
-#  ZONE REACTION — TOUCH / BREAK / REJECT (chạy trên H1 riêng)
+#  SIGNAL 3 — TOUCH / BREAK / REJECT  (chạy trên H1 + H4)
+#  Thay thế hoàn toàn BOS BREAK cũ. Mặc định BẬT.
 # ════════════════════════════════════════════════════════════
-_zone_reaction_state: dict = {}
-
-
-def get_zone_reaction_state(symbol: str) -> dict:
-    if symbol not in _zone_reaction_state:
-        _zone_reaction_state[symbol] = {
-            "touched_zones": {},   # {(type, mid): last_candle_ts}
-            "initialized":   False,
-        }
-    return _zone_reaction_state[symbol]
-
-
 def check_zone_reaction(symbol: str, df: pd.DataFrame, state: dict) -> list:
     """
-    Check TOUCH/BREAK/REJECT trên khung thời gian truyền vào (thường là H1).
-    Độc lập hoàn toàn với check_strategy_sr (LONG/SHORT/BOS).
+    1 nến đã đóng chạm vùng → kết quả ngay (TOUCH/BREAK/REJECT), không chờ nến sau.
+    symbol: đã có suffix khung, ví dụ BTCUSDT_zrH1, BTCUSDT_zrH4
     """
     params = get_params(state)
-    if not params.get("touch_signal", False):
+    if not params.get("touch_signal", True):
         return []
 
-    rs = get_zone_reaction_state(symbol)
+    bs = get_bos_state(symbol)
 
     df_closed = df.iloc[:-1].reset_index(drop=True)
+    if len(df_closed) < 60:
+        return []
+
     price     = float(df_closed["close"].iloc[-1])
     candle_ts = float(df_closed["timestamp"].iloc[-1])
 
     zones, atr = _get_zones(df_closed, params)
     signals = []
-    first_run = not rs["initialized"]
+    first_run = not bs["initialized"]
 
+    # Supply (Kháng cự)
     for z in [z for z in zones if z["type"] == "supply"]:
         zkey = ("supply", round(z["mid"], 4))
-        last_ts = rs["touched_zones"].get(zkey, 0)
+        last_ts = bs["touched_zones"].get(zkey, 0)
         if candle_ts <= last_ts:
             continue
         touched_now = (df_closed["high"].iloc[-1] >= z["bot"] and df_closed["low"].iloc[-1] <= z["top"])
         if not touched_now:
             continue
-        rs["touched_zones"][zkey] = candle_ts
+        bs["touched_zones"][zkey] = candle_ts
         if first_run:
             continue
         if price > z["top"]:
@@ -487,15 +412,16 @@ def check_zone_reaction(symbol: str, df: pd.DataFrame, state: dict) -> list:
             signals.append({"type": "TOUCH", "zone_type": "supply",
                              "price": round(price, 4), "zone_top": round(z["top"], 4), "zone_bot": round(z["bot"], 4)})
 
+    # Demand (Hỗ trợ)
     for z in [z for z in zones if z["type"] == "demand"]:
         zkey = ("demand", round(z["mid"], 4))
-        last_ts = rs["touched_zones"].get(zkey, 0)
+        last_ts = bs["touched_zones"].get(zkey, 0)
         if candle_ts <= last_ts:
             continue
         touched_now = (df_closed["high"].iloc[-1] >= z["bot"] and df_closed["low"].iloc[-1] <= z["top"])
         if not touched_now:
             continue
-        rs["touched_zones"][zkey] = candle_ts
+        bs["touched_zones"][zkey] = candle_ts
         if first_run:
             continue
         if price < z["bot"]:
@@ -508,11 +434,65 @@ def check_zone_reaction(symbol: str, df: pd.DataFrame, state: dict) -> list:
             signals.append({"type": "TOUCH", "zone_type": "demand",
                              "price": round(price, 4), "zone_top": round(z["top"], 4), "zone_bot": round(z["bot"], 4)})
 
-    if len(rs["touched_zones"]) > 30:
-        keys = list(rs["touched_zones"].keys())[-20:]
-        rs["touched_zones"] = {k: rs["touched_zones"][k] for k in keys}
+    if len(bs["touched_zones"]) > 30:
+        keys = list(bs["touched_zones"].keys())[-20:]
+        bs["touched_zones"] = {k: bs["touched_zones"][k] for k in keys}
 
     if first_run:
-        rs["initialized"] = True
+        bs["initialized"] = True
+
+    return signals
+
+
+# ════════════════════════════════════════════════════════════
+#  SIGNAL 4 — MA20 / EMA200 CROSS  (chạy độc lập trên M15, H1, H4)
+# ════════════════════════════════════════════════════════════
+def check_ma_cross(symbol: str, df: pd.DataFrame, state: dict) -> list:
+    """
+    Golden Cross: MA20 cắt LÊN trên EMA200
+    Death Cross : MA20 cắt XUỐNG dưới EMA200
+    symbol: đã có suffix khung, ví dụ BTCUSDT_maM15, BTCUSDT_maH1, BTCUSDT_maH4
+    """
+    params = get_params(state)
+    ms = get_ma_cross_state(symbol)
+
+    df_closed = df.iloc[:-1].reset_index(drop=True)
+    if len(df_closed) < params["ema200_len"] + 5:
+        return []
+
+    ma20    = _ema(df_closed["close"], params["ma_len"])
+    ema200  = _ema(df_closed["close"], params["ema200_len"])
+
+    ma_cur,  ma_prv  = float(ma20.iloc[-1]),   float(ma20.iloc[-2])
+    ema_cur, ema_prv = float(ema200.iloc[-1]), float(ema200.iloc[-2])
+
+    golden_cross = ma_prv <= ema_prv and ma_cur > ema_cur
+    death_cross  = ma_prv >= ema_prv and ma_cur < ema_cur
+
+    signals = []
+    first_run = not ms["initialized"]
+    ms["initialized"] = True
+
+    if first_run:
+        return []  # bỏ qua lần check đầu (tránh báo sai do thiếu dữ liệu lịch sử)
+
+    price = float(df_closed["close"].iloc[-1])
+
+    if golden_cross:
+        signals.append({
+            "type":  "MA_CROSS",
+            "direction": "GOLDEN",
+            "price": round(price, 4),
+            "ma20":  round(ma_cur, 4),
+            "ema200": round(ema_cur, 4),
+        })
+    elif death_cross:
+        signals.append({
+            "type":  "MA_CROSS",
+            "direction": "DEATH",
+            "price": round(price, 4),
+            "ma20":  round(ma_cur, 4),
+            "ema200": round(ema_cur, 4),
+        })
 
     return signals
