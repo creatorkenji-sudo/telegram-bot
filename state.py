@@ -29,8 +29,7 @@ state = {
         "ma_buf_pct":   0.3,
         "bos_wait":     20,
         "cooldown_min": 30,
-        "touch_signal": False,
-        "zone_reaction_tf": "h1",
+        "touch_signal": True,   # TOUCH/BREAK/REJECT — mặc định BẬT (chạy H1+H4)
     },
 
     # ── Bật/tắt chiến lược — khai báo đầy đủ ngay từ đầu ────

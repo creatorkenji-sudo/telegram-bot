@@ -85,8 +85,7 @@ def cmd_sr_set(update, context):
     if len(context.args) < 2:
         update.message.reply_text(
             "❌ Dùng: /sr_set [param] [value]\n"
-            "Ví dụ: /sr_set swing_length 8\n"
-            "Ví dụ: /sr_set zone_reaction_tf m15"
+            "Ví dụ: /sr_set swing_length 8"
         )
         return
     key = context.args[0].lower()
@@ -95,18 +94,6 @@ def cmd_sr_set(update, context):
         from strategy_sr import DEFAULT_PARAMS
         state["sr_params"] = DEFAULT_PARAMS.copy()
 
-    # ── Param dạng string: timeframe ──
-    if key == "zone_reaction_tf":
-        tf = context.args[1].lower()
-        valid_tf = ["m5", "m15", "h1", "h4"]
-        if tf not in valid_tf:
-            update.message.reply_text(f"❌ Timeframe không hợp lệ\nChọn: {', '.join(valid_tf)}")
-            return
-        state["sr_params"]["zone_reaction_tf"] = tf
-        update.message.reply_text(f"✅ Đã cập nhật: zone_reaction_tf = {tf}\n\nGõ /sr_params để xem tất cả")
-        return
-
-    # ── Param dạng số ──
     try:
         val = float(context.args[1])
     except ValueError:
@@ -120,7 +107,7 @@ def cmd_sr_set(update, context):
                   "stoch_os","vol_ma","wait_bars","ma_len","ema200_len","bos_wait","cooldown_min"]
 
     if key not in valid_keys:
-        update.message.reply_text(f"❌ Param không hợp lệ\nCác param: {', '.join(valid_keys)}, zone_reaction_tf")
+        update.message.reply_text(f"❌ Param không hợp lệ\nCác param: {', '.join(valid_keys)}")
         return
 
     state["sr_params"][key] = int(val) if key in int_keys else round(val, 2)
@@ -133,18 +120,15 @@ def cmd_sr_reset(update, context):
     update.message.reply_text("🔄 Đã reset CL SR về params mặc định\n\nGõ /sr_params để xem")
 
 
-
-
-
 def cmd_sr_touch(update, context):
-    """Bật/tắt signal chạm vùng (TOUCH/BREAK/REJECT). Mặc định TẮT — chỉ phát LONG/SHORT/BOS."""
+    """Bật/tắt signal chạm vùng (TOUCH/BREAK/REJECT) — chạy trên H1+H4. Mặc định BẬT."""
     if "sr_params" not in state:
         from strategy_sr import DEFAULT_PARAMS
         state["sr_params"] = DEFAULT_PARAMS.copy()
-    cur = state["sr_params"].get("touch_signal", False)
+    cur = state["sr_params"].get("touch_signal", True)
     state["sr_params"]["touch_signal"] = not cur
     icon = "✅ BẬT" if not cur else "❌ TẮT"
-    update.message.reply_text(f"🔶 Signal chạm vùng H1 (Touch/Break/Reject)\nTrạng thái: {icon}\n\nKhi TẮT chỉ phát LONG/SHORT/BOS Pullback/BOS Break (M5/M15)\nKhi BẬT thêm check TOUCH/BREAK/REJECT trên khung H1")
+    update.message.reply_text(f"🔶 Signal chạm vùng (Touch/Break/Reject) — H1+H4\nTrạng thái: {icon}\n\nKhi TẮT chỉ còn LONG/SHORT (H1+H4), BOS Pullback (M15+H1), MA Cross (M15/H1/H4)")
 
 
 def cmd_menu(update, context):
@@ -348,10 +332,8 @@ def cmd_sr_params(update, context):
     }
     for k, lbl in labels.items():
         msg += f"  {lbl}: {p.get(k, '?')}\n"
-    touch_icon = "✅ BẬT" if p.get("touch_signal", False) else "❌ TẮT"
-    msg += f"  🔶 Signal chạm vùng (Touch/Break/Reject): {touch_icon}\n"
-    zr_tf = p.get("zone_reaction_tf", "h1")
-    msg += f"  ⏱ Khung Zone Reaction: {zr_tf}\n"
+    touch_icon = "✅ BẬT" if p.get("touch_signal", True) else "❌ TẮT"
+    msg += f"  🔶 Touch/Break/Reject (H1+H4): {touch_icon}\n"
     msg += "━━━━━━━━━━━━━━━━━━━━\n/sr_set [param] [value]\n/sr_touch — bật/tắt signal chạm vùng"
     update.message.reply_text(msg)
 

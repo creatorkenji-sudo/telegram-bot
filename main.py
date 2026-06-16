@@ -9,7 +9,7 @@ from data import get_klines
 from trade_tracker import track_entry, check_all, format_result, get_stats, reset_history
 from strategy_c import check_strategy_c
 from strategy_d import check_strategy_d
-from strategy_sr import check_strategy_sr, check_zone_reaction, DEFAULT_PARAMS as SR_DEFAULT_PARAMS
+from strategy_sr import check_strategy_sr, check_zone_reaction, check_ma_cross, DEFAULT_PARAMS as SR_DEFAULT_PARAMS
 from trend import multi_trend, detect_kumo_cross
 from entry import check_entry
 from ema_strategy import check_ema_signal, check_sltp, get_trade_state
@@ -18,8 +18,9 @@ from formatter import (
     format_kumo_cross, format_ichimoku_entry,
     format_ema_signal, format_sltp_result, format_startup, format_heartbeat,
     format_strategy_c, format_strategy_d,
-    format_sr_long, format_sr_short, format_sr_bos_long, format_sr_bos_break,
+    format_sr_long, format_sr_short, format_sr_bos_long,
     format_sr_touch, format_sr_break, format_sr_reject,
+    format_ma_cross,
     format_menu, format_status
 )
 from state import state
@@ -176,7 +177,7 @@ def run_strategy_d(symbol: str):
 
 
 # ── Chiến lược SR: Hỗ trợ Kháng cự ──────────────────────────
-def _send_sr_signals(symbol: str, signals: list, tf_label: str, include_bos_break: bool):
+def _send_sr_signals(symbol: str, signals: list, tf_label: str):
     for sig in signals:
         t = sig["type"]
         sig["tf"] = tf_label
@@ -188,36 +189,54 @@ def _send_sr_signals(symbol: str, signals: list, tf_label: str, include_bos_brea
             track_entry(symbol, "CL_SR", "SHORT", sig["entry"], sig["sl"], sig["tp"])
         elif t == "BOS_LONG":
             send(format_sr_bos_long(symbol, sig))
-        elif t == "BOS_BREAK" and include_bos_break:
-            send(format_sr_bos_break(symbol, sig))
         elif t == "TOUCH":
             send(format_sr_touch(symbol, sig))
         elif t == "BREAK":
             send(format_sr_break(symbol, sig))
         elif t == "REJECT":
             send(format_sr_reject(symbol, sig))
+        elif t == "MA_CROSS":
+            send(format_ma_cross(symbol, sig))
+
 
 def run_strategy_sr(symbol: str):
     if not state["strategies"].get("sr"):
         return
-    # Check M5 — chỉ LONG/SHORT/BOS_LONG, KHÔNG báo BOS_BREAK (tránh spam)
-    df_m5  = get_klines(symbol, TIMEFRAMES["m5"])
-    sigs_m5 = check_strategy_sr(symbol + "_m5", df_m5, state)
-    _send_sr_signals(symbol, sigs_m5, "5m", include_bos_break=True)
-    # Check M15 — đầy đủ tất cả signal, BOS_BREAK xác nhận trên nến 15m đã đóng
-    df_m15  = get_klines(symbol, TIMEFRAMES["m15"])
-    sigs_m15 = check_strategy_sr(symbol + "_m15", df_m15, state)
-    _send_sr_signals(symbol, sigs_m15, "15m", include_bos_break=True)
 
-    # ── Zone Reaction (TOUCH/BREAK/REJECT) — khung tùy chỉnh qua /sr_set zone_reaction_tf ──
-    sr_params = state.get("sr_params", {})
-    if sr_params.get("touch_signal", False):
-        zr_tf = sr_params.get("zone_reaction_tf", "h1")
-        tf_code  = TIMEFRAMES.get(zr_tf, TIMEFRAMES["h1"])
-        tf_label = {"m5": "5m", "m15": "15m", "h1": "1h", "h4": "4h"}.get(zr_tf, "1h")
-        df_zr = get_klines(symbol, tf_code)
-        sigs_zr = check_zone_reaction(symbol + "_" + zr_tf, df_zr, state)
-        _send_sr_signals(symbol, sigs_zr, tf_label, include_bos_break=False)
+    df_h1  = get_klines(symbol, TIMEFRAMES["h1"])
+    df_h4  = get_klines(symbol, TIMEFRAMES["h4"])
+    df_m15 = get_klines(symbol, TIMEFRAMES["m15"])
+
+    # ── LONG/SHORT Zone — chạy trên H1 + H4 (state riêng theo khung) ──
+    sigs_h1 = check_strategy_sr(symbol + "_zoneH1", df_h1, state)
+    _send_sr_signals(symbol, [s for s in sigs_h1 if s["type"] in ("LONG", "SHORT")], "1h")
+
+    sigs_h4 = check_strategy_sr(symbol + "_zoneH4", df_h4, state)
+    _send_sr_signals(symbol, [s for s in sigs_h4 if s["type"] in ("LONG", "SHORT")], "4h")
+
+    # ── BOS Pullback — chạy trên M15 + H1 (state riêng, gửi ngay) ─────
+    sigs_bos_m15 = check_strategy_sr(symbol + "_bosM15", df_m15, state)
+    _send_sr_signals(symbol, [s for s in sigs_bos_m15 if s["type"] == "BOS_LONG"], "15m")
+
+    sigs_bos_h1 = check_strategy_sr(symbol + "_bosH1", df_h1, state)
+    _send_sr_signals(symbol, [s for s in sigs_bos_h1 if s["type"] == "BOS_LONG"], "1h")
+
+    # ── TOUCH/BREAK/REJECT — chạy trên H1 + H4 (mặc định BẬT) ─────────
+    sigs_zr_h1 = check_zone_reaction(symbol + "_zrH1", df_h1, state)
+    _send_sr_signals(symbol, sigs_zr_h1, "1h")
+
+    sigs_zr_h4 = check_zone_reaction(symbol + "_zrH4", df_h4, state)
+    _send_sr_signals(symbol, sigs_zr_h4, "4h")
+
+    # ── MA20/EMA200 Cross — độc lập trên M15, H1, H4 ──────────────────
+    sigs_ma_m15 = check_ma_cross(symbol + "_maM15", df_m15, state)
+    _send_sr_signals(symbol, sigs_ma_m15, "15m")
+
+    sigs_ma_h1 = check_ma_cross(symbol + "_maH1", df_h1, state)
+    _send_sr_signals(symbol, sigs_ma_h1, "1h")
+
+    sigs_ma_h4 = check_ma_cross(symbol + "_maH4", df_h4, state)
+    _send_sr_signals(symbol, sigs_ma_h4, "4h")
 
 # ── Main loop ────────────────────────────────────────────────
 def main():

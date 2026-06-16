@@ -435,7 +435,7 @@ def format_sr_long(symbol: str, sig: dict) -> str:
     pat  = f"\n🕯 Mẫu nến  : {sig['pattern']}" if sig.get("pattern") and sig["pattern"] != "—" else ""
     return (
         f"🟢📊══════════════════📊🟢\n"
-        f"🚀 LONG — {coin}/USDT · {sig.get('tf','15m')}\n"
+        f"🚀 LONG — {coin}/USDT · {sig.get('tf','1h')}\n"
         f"🕐 {_now()}\n"
         f"━━━━━━━━━━━━━━━━━━━━\n"
         f"💰 Entry    : {sig.get('entry', sig['price']):,.4f}\n"
@@ -456,7 +456,7 @@ def format_sr_short(symbol: str, sig: dict) -> str:
     pat  = f"\n🕯 Mẫu nến  : {sig['pattern']}" if sig.get("pattern") and sig["pattern"] != "—" else ""
     return (
         f"🔴📊══════════════════📊🔴\n"
-        f"💥 SHORT — {coin}/USDT · {sig.get('tf','15m')}\n"
+        f"💥 SHORT — {coin}/USDT · {sig.get('tf','1h')}\n"
         f"🕐 {_now()}\n"
         f"━━━━━━━━━━━━━━━━━━━━\n"
         f"💰 Entry    : {sig.get('entry', sig['price']):,.4f}\n"
@@ -482,63 +482,74 @@ def format_sr_bos_long(symbol: str, sig: dict) -> str:
         f"🕐 {_now()}"
     )
 
-def format_sr_bos_break(symbol: str, sig: dict) -> str:
-    coin = symbol.replace("USDT", "")
-    if sig["direction"] == "UP":
-        return (
-            f"🔷 B↑ {coin} phá kháng cự\n"
-            f"Giá: {sig['price']:,.4f} · Vùng: {sig['zone_level']:,.4f}\n"
-            f"🕐 {_now()}"
-        )
-    else:
-        return (
-            f"🟡 B↓ {coin} phá hỗ trợ\n"
-            f"Giá: {sig['price']:,.4f} · Vùng: {sig['zone_level']:,.4f}\n"
-            f"🕐 {_now()}"
-        )
-
-
 
 # ════════════════════════════════════════════════════════════
 #  TOUCH / BREAK / REJECT — Chạm / Phá / Đảo chiều
 # ════════════════════════════════════════════════════════════
 def format_sr_touch(symbol: str, sig: dict) -> str:
     coin = symbol.replace("USDT", "")
+    tf    = sig.get("tf", "1h")
     zname = "Kháng cự" if sig["zone_type"] == "supply" else "Hỗ trợ"
     icon  = "🔶" if sig["zone_type"] == "supply" else "🔷"
     return (
-        f"{icon} {coin} chạm {zname}\n"
+        f"{icon} {coin} chạm {zname} · {tf}\n"
         f"Giá: {sig['price']:,.4f} · Vùng: {sig['zone_bot']:,.4f}–{sig['zone_top']:,.4f}\n"
         f"🕐 {_now()}"
     )
 
 def format_sr_break(symbol: str, sig: dict) -> str:
     coin = symbol.replace("USDT", "")
+    tf   = sig.get("tf", "1h")
     if sig["zone_type"] == "supply":
         return (
-            f"🔵 {coin} PHÁ Kháng cự — giá tăng tiếp\n"
+            f"🔵 {coin} PHÁ Kháng cự · {tf} — giá tăng tiếp\n"
             f"Giá: {sig['price']:,.4f} · Vùng: {sig['zone_bot']:,.4f}–{sig['zone_top']:,.4f}\n"
             f"🕐 {_now()}"
         )
     else:
         return (
-            f"🟠 {coin} PHÁ Hỗ trợ — giá giảm tiếp\n"
+            f"🟠 {coin} PHÁ Hỗ trợ · {tf} — giá giảm tiếp\n"
             f"Giá: {sig['price']:,.4f} · Vùng: {sig['zone_bot']:,.4f}–{sig['zone_top']:,.4f}\n"
             f"🕐 {_now()}"
         )
 
 def format_sr_reject(symbol: str, sig: dict) -> str:
     coin = symbol.replace("USDT", "")
+    tf   = sig.get("tf", "1h")
     if sig["zone_type"] == "supply":
         return (
-            f"🟡 {coin} KHÔNG PHÁ Kháng cự — đảo chiều giảm\n"
+            f"🟡 {coin} KHÔNG PHÁ Kháng cự · {tf} — đảo chiều giảm\n"
             f"Giá: {sig['price']:,.4f} · Vùng: {sig['zone_bot']:,.4f}–{sig['zone_top']:,.4f}\n"
             f"🕐 {_now()}"
         )
     else:
         return (
-            f"🟢 {coin} KHÔNG PHÁ Hỗ trợ — đảo chiều tăng\n"
+            f"🟢 {coin} KHÔNG PHÁ Hỗ trợ · {tf} — đảo chiều tăng\n"
             f"Giá: {sig['price']:,.4f} · Vùng: {sig['zone_bot']:,.4f}–{sig['zone_top']:,.4f}\n"
+            f"🕐 {_now()}"
+        )
+
+
+# ════════════════════════════════════════════════════════════
+#  MA20 / EMA200 CROSS
+# ════════════════════════════════════════════════════════════
+def format_ma_cross(symbol: str, sig: dict) -> str:
+    coin = symbol.replace("USDT", "")
+    tf   = sig.get("tf", "1h")
+    if sig["direction"] == "GOLDEN":
+        return (
+            f"🟢 GOLDEN CROSS — {coin}/USDT · {tf}\n"
+            f"MA20 cắt LÊN trên EMA200\n"
+            f"💰 Giá: {sig['price']:,.4f}\n"
+            f"MA20: {sig['ma20']:,.4f} · EMA200: {sig['ema200']:,.4f}\n"
+            f"🕐 {_now()}"
+        )
+    else:
+        return (
+            f"🔴 DEATH CROSS — {coin}/USDT · {tf}\n"
+            f"MA20 cắt XUỐNG dưới EMA200\n"
+            f"💰 Giá: {sig['price']:,.4f}\n"
+            f"MA20: {sig['ma20']:,.4f} · EMA200: {sig['ema200']:,.4f}\n"
             f"🕐 {_now()}"
         )
 
