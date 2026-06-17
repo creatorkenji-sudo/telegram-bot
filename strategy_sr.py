@@ -315,7 +315,11 @@ def check_strategy_sr(symbol: str, df: pd.DataFrame, state: dict) -> list:
             zone    = dem_zones[0] if dem_zones else {}
             entry   = price
             sl      = zone.get("bot", entry * 0.985)
+            if sl >= entry:          # nến chỉ chạm zone bằng wick, close dưới zone_bot → SL đảo ngược, bỏ qua
+                sl = entry * 0.985
             risk    = entry - sl
+            if risk <= 0:
+                return signals
             tp      = entry + risk * 2
             signals.append({
                 "type":     "LONG",
@@ -341,7 +345,11 @@ def check_strategy_sr(symbol: str, df: pd.DataFrame, state: dict) -> list:
             zone    = sup_zones[0] if sup_zones else {}
             entry   = price
             sl      = zone.get("top", entry * 1.015)
+            if sl <= entry:          # nến chỉ chạm zone bằng wick, close trên zone_top → SL đảo ngược, bỏ qua
+                sl = entry * 1.015
             risk    = sl - entry
+            if risk <= 0:
+                return signals
             tp      = entry - risk * 2
             signals.append({
                 "type":     "SHORT",

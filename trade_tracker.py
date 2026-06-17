@@ -170,11 +170,11 @@ def format_result(record: dict) -> str:
     if rtype == "TP":
         bar   = "🎯🟢══════════════════🟢🎯"
         title = f"✅ CHỐT LỜI — {coin}/USDT"
-        pstr  = f"+{pnl}%"
+        pstr  = f"+{abs(pnl):.2f}%"
     else:
         bar   = "🛡🔴══════════════════🔴🛡"
         title = f"❌ CẮT LỖ — {coin}/USDT"
-        pstr  = f"{pnl}%"
+        pstr  = f"-{abs(pnl):.2f}%"
 
     return (
         f"{bar}\n{title}\n"
