@@ -317,6 +317,7 @@ def check_strategy_sr(symbol: str, df: pd.DataFrame, state: dict) -> list:
             sl      = zone.get("bot", entry * 0.985)
             if sl >= entry:          # nến chỉ chạm zone bằng wick, close dưới zone_bot → SL đảo ngược, bỏ qua
                 sl = entry * 0.985
+            sl      = min(sl, entry * 0.995)  # SL tối thiểu 0.5% từ entry
             risk    = entry - sl
             if risk <= 0:
                 return signals
@@ -347,6 +348,7 @@ def check_strategy_sr(symbol: str, df: pd.DataFrame, state: dict) -> list:
             sl      = zone.get("top", entry * 1.015)
             if sl <= entry:          # nến chỉ chạm zone bằng wick, close trên zone_top → SL đảo ngược, bỏ qua
                 sl = entry * 1.015
+            sl      = max(sl, entry * 1.005)  # SL tối thiểu 0.5% từ entry
             risk    = sl - entry
             if risk <= 0:
                 return signals
