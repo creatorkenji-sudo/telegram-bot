@@ -1,5 +1,7 @@
 # ============================================================
-#  strategy_sr.py — Chiến lược Hỗ trợ Kháng cự (ZoneCandle)
+#  strategy_sr.py — Chiến lược Hỗ trợ Kháng cự (ZoneCandle v1)
+#
+#  Đồng bộ logic với Pine Script "Zone Candle v1" trên TradingView
 #
 #  Signal 1: LONG/SHORT Zone     — chạy trên H1 + H4
 #  Signal 2: BOS Pullback        — chạy trên M15 + H1
@@ -13,15 +15,18 @@ import pandas as pd
 # ── Cooldown ──────────────────────────────────────────────────
 _last_signal: dict = {}
 
-# ── Default params ────────────────────────────────────────────
+# ── Default params (khớp Pine Script) ─────────────────────────
 DEFAULT_PARAMS = {
     "swing_length": 10,
     "box_width":    2.5,
+    "history":      20,
+    "filter_zone":  True,
+    "min_atr":      1.5,
     "stoch_k":      14,
     "stoch_sm":     3,
     "stoch_d":      3,
-    "stoch_ob":     70,
-    "stoch_os":     30,
+    "stoch_ob":     80,       # Pine: 80 (was 70)
+    "stoch_os":     20,       # Pine: 20 (was 30)
     "vol_ma":       20,
     "vol_mult":     1.2,
     "wait_bars":    3,
@@ -30,7 +35,7 @@ DEFAULT_PARAMS = {
     "ma_buf_pct":   0.3,
     "bos_wait":     20,
     "cooldown_min": 30,
-    "touch_signal": True,   # TOUCH/BREAK/REJECT — mặc định BẬT, thay cho BOS Break
+    "touch_signal": True,
 }
 
 # ── State riêng theo symbol+suffix khung ──────────────────────
@@ -60,7 +65,7 @@ def get_bos_state(symbol: str) -> dict:
             "bos_up":     False,
             "ma_touched": False,
             "bos_bars":   0,
-            "touched_zones": {},   # {(zone_type, mid): last_candle_ts} — cho TOUCH/BREAK/REJECT
+            "touched_zones": {},
             "initialized":   False,
         }
     return _bos_state[symbol]
@@ -117,22 +122,14 @@ def _pivot_low(df: pd.DataFrame, length: int):
 
 
 # ════════════════════════════════════════════════════════════
-#  ZONE DETECTION — gộp vùng chồng lấp/gần nhau
+#  ZONE DETECTION — khớp Pine Script f_overlap + f_draw_zone
+#  KHÔNG merge zone — chỉ skip zone mới nếu trùng zone cũ
 # ════════════════════════════════════════════════════════════
-def _merge_zones(zone_list: list, atr: float) -> list:
-    if not zone_list:
-        return []
-    zone_list = sorted(zone_list, key=lambda z: z["bot"])
-    merged = [zone_list[0]]
-    for z in zone_list[1:]:
-        last = merged[-1]
-        if z["bot"] <= last["top"] + atr * 2:
-            last["top"] = max(last["top"], z["top"])
-            last["bot"] = min(last["bot"], z["bot"])
-            last["mid"] = (last["top"] + last["bot"]) / 2
-        else:
-            merged.append(z)
-    return merged
+def _overlap(mid: float, existing_zones: list, atr: float) -> bool:
+    for z in existing_zones:
+        if mid >= z["mid"] - atr * 2 and mid <= z["mid"] + atr * 2:
+            return True
+    return False
 
 
 def _get_zones(df: pd.DataFrame, params: dict):
@@ -140,19 +137,32 @@ def _get_zones(df: pd.DataFrame, params: dict):
     bw     = params["box_width"]
     atr    = _atr(df)
     buf    = atr * (bw / 10)
+    history    = params.get("history", 20)
+    filter_on  = params.get("filter_zone", True)
+    min_atr    = params.get("min_atr", 1.5)
 
-    ph_list = _pivot_high(df, swing)[-5:]
-    pl_list = _pivot_low(df,  swing)[-5:]
+    ph_list = _pivot_high(df, swing)[-(history):]
+    pl_list = _pivot_low(df,  swing)[-(history):]
 
-    sup_zones = [{"type": "supply", "top": v, "bot": v - buf, "mid": v - buf/2} for v in ph_list]
-    dem_zones = [{"type": "demand", "top": v + buf, "bot": v, "mid": v + buf/2} for v in pl_list]
+    # Supply zones — overlap skip (như Pine f_overlap)
+    sup_zones = []
+    for idx, v in enumerate(ph_list):
+        if filter_on and idx > 0:
+            if abs(v - ph_list[idx - 1]) < atr * min_atr:
+                continue
+        mid = v - buf / 2
+        if not _overlap(mid, sup_zones, atr):
+            sup_zones.append({"type": "supply", "top": v, "bot": v - buf, "mid": mid})
 
-    sup_zones = _merge_zones(sup_zones, atr)
-    dem_zones = _merge_zones(dem_zones, atr)
-    for z in sup_zones:
-        z["type"] = "supply"
-    for z in dem_zones:
-        z["type"] = "demand"
+    # Demand zones — overlap skip
+    dem_zones = []
+    for idx, v in enumerate(pl_list):
+        if filter_on and idx > 0:
+            if abs(v - pl_list[idx - 1]) < atr * min_atr:
+                continue
+        mid = v + buf / 2
+        if not _overlap(mid, dem_zones, atr):
+            dem_zones.append({"type": "demand", "top": v + buf, "bot": v, "mid": mid})
 
     return sup_zones + dem_zones, atr
 
@@ -167,6 +177,29 @@ def _price_in_zone(df: pd.DataFrame, zones: list, zone_type: str) -> list:
         if high >= z["bot"] and low <= z["top"]:
             matched.append(z)
     return matched
+
+
+# ════════════════════════════════════════════════════════════
+#  SL LOOKUP — khớp Pine f_demand_bottom / f_supply_top
+# ════════════════════════════════════════════════════════════
+def _demand_bottom(price: float, zones: list) -> float:
+    """Pine: f_demand_bottom — tìm demand zone có top ≈ price (±1%), trả về bot."""
+    for z in zones:
+        if z["type"] != "demand":
+            continue
+        if z["top"] >= price * 0.99 and z["top"] <= price * 1.01:
+            return z["bot"]
+    return float("nan")
+
+
+def _supply_top(price: float, zones: list) -> float:
+    """Pine: f_supply_top — tìm supply zone có bot ≈ price (±1%), trả về top."""
+    for z in zones:
+        if z["type"] != "supply":
+            continue
+        if z["bot"] >= price * 0.99 and z["bot"] <= price * 1.01:
+            return z["top"]
+    return float("nan")
 
 
 # ════════════════════════════════════════════════════════════
@@ -201,13 +234,8 @@ def _nearest_supply_above(price: float, zones: list):
 # ════════════════════════════════════════════════════════════
 #  SIGNAL 1 — LONG/SHORT ZONE  (chạy trên H1 + H4)
 #  SIGNAL 2 — BOS PULLBACK     (chạy trên M15 + H1)
-#  Dùng chung 1 hàm check_strategy_sr; symbol đã có suffix khung
 # ════════════════════════════════════════════════════════════
 def check_strategy_sr(symbol: str, df: pd.DataFrame, state: dict) -> list:
-    """
-    Trả về list signal dict cho LONG/SHORT/BOS_LONG.
-    symbol: đã có suffix khung, ví dụ BTCUSDT_zoneH1, BTCUSDT_bosM15
-    """
     params  = get_params(state)
     zs      = get_zone_state(symbol)
     bs      = get_bos_state(symbol)
@@ -251,7 +279,7 @@ def check_strategy_sr(symbol: str, df: pd.DataFrame, state: dict) -> list:
 
     signals = []
 
-    # ── Kích hoạt BOS UP khi Supply bị phá (close[1] >= top supply) ──
+    # ── Kích hoạt BOS UP khi Supply bị phá (close >= top supply) ──
     for z in [z for z in zones if z["type"] == "supply"]:
         if price_1 >= z["top"]:
             if price_1 > ma_val and ma_val > ma_val1:
@@ -312,16 +340,18 @@ def check_strategy_sr(symbol: str, df: pd.DataFrame, state: dict) -> list:
         elapsed = time.time() - _last_signal.get(cd_key, {}).get("ts", 0)
         if elapsed >= cd_min * 60:
             pattern = _detect_pattern(df_closed)
-            zone    = dem_zones[0] if dem_zones else {}
             entry   = price
-            sl      = zone.get("bot", entry * 0.985)
-            if sl >= entry:          # nến chỉ chạm zone bằng wick, close dưới zone_bot → SL đảo ngược, bỏ qua
+            # SL: Pine f_demand_bottom — tìm zone có top ≈ giá, SL = bot
+            sl = _demand_bottom(price, zones)
+            if np.isnan(sl):
                 sl = entry * 0.985
-            sl      = min(sl, entry * 0.995)  # SL tối thiểu 0.5% từ entry
-            risk    = entry - sl
+            sl = min(sl, entry * 0.995)
+            risk = entry - sl
             if risk <= 0:
                 return signals
-            tp      = entry + risk * 2
+            tp = entry + risk * 2
+            # Tìm zone match để hiển thị
+            zone = dem_zones[0] if dem_zones else {}
             signals.append({
                 "type":     "LONG",
                 "price":    round(price, 4),
@@ -343,16 +373,17 @@ def check_strategy_sr(symbol: str, df: pd.DataFrame, state: dict) -> list:
         elapsed = time.time() - _last_signal.get(cd_key, {}).get("ts", 0)
         if elapsed >= cd_min * 60:
             pattern = _detect_pattern(df_closed)
-            zone    = sup_zones[0] if sup_zones else {}
             entry   = price
-            sl      = zone.get("top", entry * 1.015)
-            if sl <= entry:          # nến chỉ chạm zone bằng wick, close trên zone_top → SL đảo ngược, bỏ qua
+            # SL: Pine f_supply_top — tìm zone có bot ≈ giá, SL = top
+            sl = _supply_top(price, zones)
+            if np.isnan(sl):
                 sl = entry * 1.015
-            sl      = max(sl, entry * 1.005)  # SL tối thiểu 0.5% từ entry
-            risk    = sl - entry
+            sl = max(sl, entry * 1.005)
+            risk = sl - entry
             if risk <= 0:
                 return signals
-            tp      = entry - risk * 2
+            tp = entry - risk * 2
+            zone = sup_zones[0] if sup_zones else {}
             signals.append({
                 "type":     "SHORT",
                 "price":    round(price, 4),
@@ -376,13 +407,8 @@ def check_strategy_sr(symbol: str, df: pd.DataFrame, state: dict) -> list:
 
 # ════════════════════════════════════════════════════════════
 #  SIGNAL 3 — TOUCH / BREAK / REJECT  (chạy trên H1 + H4)
-#  Thay thế hoàn toàn BOS BREAK cũ. Mặc định BẬT.
 # ════════════════════════════════════════════════════════════
 def check_zone_reaction(symbol: str, df: pd.DataFrame, state: dict) -> list:
-    """
-    1 nến đã đóng chạm vùng → kết quả ngay (TOUCH/BREAK/REJECT), không chờ nến sau.
-    symbol: đã có suffix khung, ví dụ BTCUSDT_zrH1, BTCUSDT_zrH4
-    """
     params = get_params(state)
     if not params.get("touch_signal", True):
         return []
@@ -458,11 +484,6 @@ def check_zone_reaction(symbol: str, df: pd.DataFrame, state: dict) -> list:
 #  SIGNAL 4 — MA20 / EMA200 CROSS  (chạy độc lập trên M15, H1, H4)
 # ════════════════════════════════════════════════════════════
 def check_ma_cross(symbol: str, df: pd.DataFrame, state: dict) -> list:
-    """
-    Golden Cross: MA20 cắt LÊN trên EMA200
-    Death Cross : MA20 cắt XUỐNG dưới EMA200
-    symbol: đã có suffix khung, ví dụ BTCUSDT_maM15, BTCUSDT_maH1, BTCUSDT_maH4
-    """
     params = get_params(state)
     ms = get_ma_cross_state(symbol)
 
@@ -484,7 +505,7 @@ def check_ma_cross(symbol: str, df: pd.DataFrame, state: dict) -> list:
     ms["initialized"] = True
 
     if first_run:
-        return []  # bỏ qua lần check đầu (tránh báo sai do thiếu dữ liệu lịch sử)
+        return []
 
     price = float(df_closed["close"].iloc[-1])
 
