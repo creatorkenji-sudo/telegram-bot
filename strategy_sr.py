@@ -108,7 +108,7 @@ def _pivot_high(df: pd.DataFrame, length: int):
     ph = []
     for i in range(length, len(df) - length):
         if highs.iloc[i] == highs.iloc[i-length:i+length+1].max():
-            ph.append(highs.iloc[i])
+            ph.append((i, highs.iloc[i]))
     return ph
 
 
@@ -117,7 +117,7 @@ def _pivot_low(df: pd.DataFrame, length: int):
     pl = []
     for i in range(length, len(df) - length):
         if lows.iloc[i] == lows.iloc[i-length:i+length+1].min():
-            pl.append(lows.iloc[i])
+            pl.append((i, lows.iloc[i]))
     return pl
 
 
@@ -140,29 +140,50 @@ def _get_zones(df: pd.DataFrame, params: dict):
     history    = params.get("history", 20)
     filter_on  = params.get("filter_zone", True)
     min_atr    = params.get("min_atr", 1.5)
+    closes     = df["close"]
 
-    ph_list = _pivot_high(df, swing)[-(history):]
+    ph_list = _pivot_high(df, swing)[-(history):]  # [(bar_idx, value), ...]
     pl_list = _pivot_low(df,  swing)[-(history):]
 
-    # Supply zones — overlap skip (như Pine f_overlap)
+    # Supply zones — overlap skip + xóa zone bị phá (như Pine BOS delete)
     sup_zones = []
-    for idx, v in enumerate(ph_list):
-        if filter_on and idx > 0:
-            if abs(v - ph_list[idx - 1]) < atr * min_atr:
+    for list_idx, (bar_idx, v) in enumerate(ph_list):
+        if filter_on and list_idx > 0:
+            if abs(v - ph_list[list_idx - 1][1]) < atr * min_atr:
                 continue
+        zone_top = v
+        zone_bot = v - buf
         mid = v - buf / 2
+        # Pine: khi close >= zone_top → zone bị phá, xóa
+        broken = False
+        for j in range(bar_idx + 1, len(closes)):
+            if closes.iloc[j] >= zone_top:
+                broken = True
+                break
+        if broken:
+            continue
         if not _overlap(mid, sup_zones, atr):
-            sup_zones.append({"type": "supply", "top": v, "bot": v - buf, "mid": mid})
+            sup_zones.append({"type": "supply", "top": zone_top, "bot": zone_bot, "mid": mid})
 
-    # Demand zones — overlap skip
+    # Demand zones — overlap skip + xóa zone bị phá
     dem_zones = []
-    for idx, v in enumerate(pl_list):
-        if filter_on and idx > 0:
-            if abs(v - pl_list[idx - 1]) < atr * min_atr:
+    for list_idx, (bar_idx, v) in enumerate(pl_list):
+        if filter_on and list_idx > 0:
+            if abs(v - pl_list[list_idx - 1][1]) < atr * min_atr:
                 continue
+        zone_top = v + buf
+        zone_bot = v
         mid = v + buf / 2
+        # Pine: khi close <= zone_bot → zone bị phá, xóa
+        broken = False
+        for j in range(bar_idx + 1, len(closes)):
+            if closes.iloc[j] <= zone_bot:
+                broken = True
+                break
+        if broken:
+            continue
         if not _overlap(mid, dem_zones, atr):
-            dem_zones.append({"type": "demand", "top": v + buf, "bot": v, "mid": mid})
+            dem_zones.append({"type": "demand", "top": zone_top, "bot": zone_bot, "mid": mid})
 
     return sup_zones + dem_zones, atr
 
